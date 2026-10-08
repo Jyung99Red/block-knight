@@ -683,6 +683,15 @@ test('the save: fresh, written and read back with progress, gear and terrain edi
     assert.deepEqual(plain(saveKit.erase(store)), plain(saveKit.fresh()));
     assert.equal(store.data.size, 0);
     assert.equal(saveKit.exists(store), false, 'erased');
+    // A save left under the old key is read, moves to the new key on the next write, and is erased with it.
+    store.setItem('blocky-rpg-save', JSON.stringify({ ...fresh, inventory: { gold: 7, items: START } }));
+    assert.equal(saveKit.exists(store), true, 'the old key counts');
+    const old = saveKit.load(store);
+    assert.equal(old.inventory.gold, 7);
+    assert.equal(saveKit.write(store, old), true);
+    assert.deepEqual([...store.data.keys()], [saveKit.KEY]);
+    store.setItem('blocky-rpg-save', '{}'); saveKit.erase(store);
+    assert.equal(store.data.size, 0, 'both keys erased');
 });
 
 test('a world with entities replays the same and survives a JSON round trip', () => {

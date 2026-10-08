@@ -14,7 +14,10 @@
 // Pure data in and out; the storage (localStorage in the page, a stand-in
 // in tests) is handed in.
 const saveKit = (() => {
-    const KEY = 'blocky-rpg-save', VERSION = 2;
+    // A save left under the key of before 2026-10-08 (the repository took its
+    // name) is read where it lies, moves on the next write and goes when erased.
+    const KEY = 'block-knight-save', OLD_KEY = 'blocky-rpg-save', VERSION = 2;
+    const kept = storage => storage?.getItem(KEY) ?? storage?.getItem(OLD_KEY) ?? null;
     const obj = v => !!v && typeof v === 'object' && !Array.isArray(v);
     const whole = v => Number.isSafeInteger(v) && v >= 0;
     // A new game: the starter gear owned and worn.
@@ -91,20 +94,20 @@ const saveKit = (() => {
     }
     function load(storage) {
         let raw = null;
-        try { raw = storage?.getItem(KEY); } catch (_) { /* Storage may be unavailable. */ }
+        try { raw = kept(storage); } catch (_) { /* Storage may be unavailable. */ }
         if (!raw) return fresh();
         try { return clean(JSON.parse(raw)); } catch (_) { return fresh(); }
     }
     function write(storage, save) {
-        try { storage.setItem(KEY, JSON.stringify(clean(save))); return true; } catch (_) { return false; }
+        try { storage.setItem(KEY, JSON.stringify(clean(save))); storage.removeItem(OLD_KEY); return true; } catch (_) { return false; }
     }
     function erase(storage) {
-        try { storage.removeItem(KEY); } catch (_) { /* Nothing to erase. */ }
+        try { storage.removeItem(KEY); storage.removeItem(OLD_KEY); } catch (_) { /* Nothing to erase. */ }
         return fresh();
     }
     // Whether a save was ever written here (the title screen's 继续冒险).
     function exists(storage) {
-        try { return storage?.getItem(KEY) != null; } catch (_) { return false; }
+        try { return kept(storage) != null; } catch (_) { return false; }
     }
     return { KEY, VERSION, fresh, clean, merge, load, write, erase, exists };
 })();

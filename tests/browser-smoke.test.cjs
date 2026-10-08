@@ -323,7 +323,7 @@ test('the world: the title screen, the base, through the north gate by touch, a 
         const still = await page.evaluate(async () => {
             const g = window.game, t0 = g.sim.time, frame = () => new Promise(resolve => requestAnimationFrame(resolve));
             g.pause(false); await frame(); await frame(); await frame(); g.pause(true);
-            return [g.title.isOpen(), g.sim.time - t0, getComputedStyle(document.querySelector('[data-menu]')).visibility, localStorage.getItem('blocky-rpg-save')];
+            return [g.title.isOpen(), g.sim.time - t0, getComputedStyle(document.querySelector('[data-menu]')).visibility, localStorage.getItem('block-knight-save')];
         });
         assert.deepEqual(still, [true, 0, 'hidden', null]);
         // Behind it the camera is not the fighter's (user, 2026-10-08): shot
@@ -358,7 +358,7 @@ test('the world: the title screen, the base, through the north gate by touch, a 
         assert.ok(await page.evaluate(() => Number(getComputedStyle(document.querySelector('[data-title-cut]')).opacity)) > 0.5);
         await page.click('[data-title-act="settings"]');
         await page.click('[data-title-settings] [data-setting="perf"][data-pick="1"]');
-        assert.deepEqual(await page.evaluate(() => [document.querySelector('[data-perf]').hidden, JSON.parse(localStorage.getItem('blocky-rpg-settings')).perf]), [true, false]);
+        assert.deepEqual(await page.evaluate(() => [document.querySelector('[data-perf]').hidden, JSON.parse(localStorage.getItem('block-knight-settings')).perf]), [true, false]);
         await page.click('[data-title-settings] [data-setting="perf"][data-pick="0"]');
         await shot(page, 'title');
         await page.click('[data-title-act="new"]');
@@ -479,7 +479,7 @@ test('the world: the title screen, the base, through the north gate by touch, a 
         assert.deepEqual(await pages(), [['设置'], true, false]);
         assert.deepEqual(await page.evaluate(() => [...document.querySelectorAll('[data-menu-settings] .setting-name')].map(e => e.textContent)), ['音效', '帧率', '镜头', '画质']);
         await page.click('[data-menu-settings] [data-setting="camera"][data-pick="2"]');
-        assert.deepEqual(await page.evaluate(() => [document.querySelector('[data-menu-settings] [data-setting="camera"][aria-checked="true"]').textContent, JSON.parse(localStorage.getItem('blocky-rpg-settings')).camera]), ['远', 'far']);
+        assert.deepEqual(await page.evaluate(() => [document.querySelector('[data-menu-settings] [data-setting="camera"][aria-checked="true"]').textContent, JSON.parse(localStorage.getItem('block-knight-settings')).camera]), ['远', 'far']);
         await page.click('[data-menu-settings] [data-setting="camera"][data-pick="1"]');
         await page.click('[data-menu-act="close"]'); await page.click('[data-menu]');
         assert.deepEqual(await pages(), [['角色'], false, true]);
@@ -490,7 +490,7 @@ test('the world: the title screen, the base, through the north gate by touch, a 
         await page.evaluate(() => { const g = window.game, p = g.sim.player; Object.assign(p, { x: p.x + 40, hp: 200 }); });
         const stood = await where();
         await page.click('[data-menu-act="title"]');
-        assert.deepEqual([await page.evaluate(() => [window.game.title.isOpen(), window.game.menu.isOpen(), localStorage.getItem('blocky-rpg-save') !== null]), await titleKeys()],
+        assert.deepEqual([await page.evaluate(() => [window.game.title.isOpen(), window.game.menu.isOpen(), localStorage.getItem('block-knight-save') !== null]), await titleKeys()],
             [[true, false, true], ['继续冒险', '新的冒险', '联机对战', '设置']]);
         assert.deepEqual(await newKey(), ['danger'], 'a save to erase: 新的冒险 is red (user, 2026-10-08)');
         await page.click('[data-title-act="new"]');
@@ -511,7 +511,7 @@ test('the world: the title screen, the base, through the north gate by touch, a 
         assert.deepEqual(await titleKeys(), ['继续冒险', '新的冒险', '联机对战', '设置']);
         // A new adventure, agreed to: the save is erased, the base is begun afresh.
         await page.click('[data-title-act="new"]'); await page.click('[data-action="erase"]');
-        assert.deepEqual(await page.evaluate(() => [window.game.title.isOpen(), window.game.panel, window.game.map, window.game.sim.progress.inventory.gold, localStorage.getItem('blocky-rpg-save')]), [false, null, 'base', 0, null]);
+        assert.deepEqual(await page.evaluate(() => [window.game.title.isOpen(), window.game.panel, window.game.map, window.game.sim.progress.inventory.gold, localStorage.getItem('block-knight-save')]), [false, null, 'base', 0, null]);
         // Rebuilding a world frees the last one: GPU memory does not grow.
         const memory = await page.evaluate(() => {
             const g = window.game, out = [];
@@ -615,7 +615,7 @@ test('two phones in one browser (?link=local): a room code, a duel to a result, 
         assert.equal(await B.page.evaluate(() => document.querySelector('[data-room-weapons]').hidden), false);
         await B.page.click('[data-weapon="assassin_dagger"]');
         await shot(B.page, 'room-weapons');
-        assert.equal(await B.page.evaluate(() => [window.game.room.weapon, localStorage.getItem('pvp-weapon')].join()), 'assassin_dagger,assassin_dagger');
+        assert.equal(await B.page.evaluate(() => [window.game.room.weapon, localStorage.getItem('block-knight-weapon')].join()), 'assassin_dagger,assassin_dagger');
         await B.page.click('[data-room-action="join"]');
         assert.match(await text(B.page, '[data-room-note]'), /你用：短刃/);
         assert.equal(await B.page.evaluate(() => document.querySelector('[data-room-action="connect"]').disabled), true);

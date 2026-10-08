@@ -6,7 +6,7 @@
 // was left without a connection. The pick is remembered on this phone.
 const roomScreen = (() => {
     const INTRO = '两台手机都要联网，不必连同一个 Wi-Fi。先选武器，然后一台创建房间，另一台输入房间号加入。';
-    const KEY = 'pvp-weapon';
+    const KEY = 'block-knight-weapon';
     // One line on how each weapon type plays.
     const LINES = { sword: '射程远，出招稳重', dagger: '出招快，连段长，要贴近' };
     const typeOf = main => gameConfig.combo.weapons[gameConfig.items[main].weapon];

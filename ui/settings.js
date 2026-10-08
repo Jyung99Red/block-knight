@@ -12,7 +12,7 @@
 // and makes the quality `custom` (user, 2026-10-08: no custom values of
 // before are kept to come back to).
 const gameSettings = (() => {
-    const KEY = 'blocky-rpg-settings';
+    const KEY = 'block-knight-settings';
     // Each setting: its label and its choices ([value, label]), in the
     // settings page's order.
     const CHOICES = Object.freeze({
