@@ -5,7 +5,7 @@
 // anything here. Mobile browsers keep audio locked until the first touch,
 // so the context is created and resumed on the first pointer press.
 const sfx = (() => {
-    const key = 'pvp-game-sfx-v1';
+    const key = 'block-knight-sfx-v1';
     let ctx = null, master = null, noise = null, enabled = true;
     try { enabled = localStorage.getItem(key) !== 'off'; } catch (_) { /* Storage may be unavailable. */ }
     function unlock() {
