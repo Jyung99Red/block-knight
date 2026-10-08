@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html lang="zh" data-client-state="loading">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="theme-color" content="#13171c">
+    <title>方块骑士 · 地图预览</title>
+    <link rel="icon" href="data:,">
+    <style data-boot-shell>
+        html[data-client-state="loading"] { background: #13171c; }
+        html[data-client-state="loading"] body > :not(#client-loading) { visibility: hidden; }
+        #client-loading { position: fixed; inset: 0; z-index: 9999; background: #13171c; color: #e8ece6; display: grid; place-content: center; gap: 16px; text-align: center; font: 14px system-ui; }
+    </style>
+</head>
+
+<body>
+    <div id="client-loading" role="status">正在加载地图预览…<button type="button" onclick="location.reload()">重新加载</button></div>
+
+    <div id="mount-map"></div>
+
+    <script src="core/client_boot.js?v=boot-20261004b" data-entry="map" onerror="document.getElementById('client-loading').firstChild.textContent='启动文件加载失败，请重新加载。'"></script>
+</body>
+
+</html>

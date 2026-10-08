@@ -1,0 +1,31 @@
+# Line endings — enforced by git, so no tool/editor/AI can introduce a noisy
+# whole-file CRLF/LF flip. All text is normalized to LF in the repository and
+# checked out as LF on every platform (Windows included).
+* text=auto eol=lf
+
+# Known source/text types: force `text` so git ALWAYS normalizes them, even
+# when a file has enough non-ASCII (e.g. Chinese UI strings) that git's
+# `text=auto` binary heuristic would otherwise misclassify it as binary and
+# skip it — which is exactly what happened to index.html and ui_pvp.js.
+*.js   text eol=lf
+*.mjs  text eol=lf
+*.cjs  text eol=lf
+*.html text eol=lf
+*.css  text eol=lf
+*.md   text eol=lf
+*.json text eol=lf
+*.svg  text eol=lf
+
+# Common binary types — never normalize or diff their bytes (guards any
+# future assets; the repo currently has none).
+*.png  binary
+*.jpg  binary
+*.jpeg binary
+*.gif  binary
+*.ico  binary
+*.webp binary
+*.woff  binary
+*.woff2 binary
+*.mp3  binary
+*.wav  binary
+*.ogg  binary

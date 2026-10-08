@@ -1,0 +1,530 @@
+/* Landscape shell: the 3D view fills the screen, controls float above it.
+   Positions of the controls come from game_config.js (ui/input.js). */
+:root {
+    --bg: #13171c;
+    --fg: #e8ece6;
+    --muted: #9ca7ae;
+    --accent: #f2b544;
+    --ctl-fill: rgba(14, 18, 23, 0.42);
+    --ctl-line: rgba(255, 255, 255, 0.55);
+    --ctl-pressed: rgba(255, 255, 255, 0.34);
+    --hud: rgba(14, 18, 23, 0.6);
+    --font: system-ui, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+}
+html, body {
+    margin: 0; height: 100%; overflow: hidden;
+    background: var(--bg); color: var(--fg); font-family: var(--font);
+    overscroll-behavior: none; touch-action: none;
+    -webkit-user-select: none; user-select: none; -webkit-touch-callout: none;
+    -webkit-tap-highlight-color: transparent; -webkit-text-size-adjust: 100%;
+}
+
+.game { position: fixed; inset: 0; overflow: hidden; touch-action: none; }
+.game-canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+.game-fallback {
+    position: absolute; inset: 0; display: grid; place-content: center; padding: 24px;
+    text-align: center; background: var(--bg); font-size: 16px; z-index: 5;
+}
+.game-fallback[hidden] { display: none; }
+/* The frame-rate line stays above the menu, so the custom quality's
+   sliders can be set while it is read (the portrait hint covers it). */
+.hud-perf {
+    position: absolute; z-index: 10; pointer-events: none;
+    bottom: calc(env(safe-area-inset-bottom, 0px) + 6px); left: 50%; transform: translateX(-50%);
+    font-size: 11px; line-height: 1.4; padding: 2px 7px; border-radius: 4px;
+    background: var(--hud); color: var(--fg); font-variant-numeric: tabular-nums; white-space: nowrap;
+}
+.hud-perf:empty { display: none; }
+/* Temporary: the sliders for the camera's angle down, field of view and
+   distance, over the frame-rate line, between the stick's zone and the
+   right-hand keys. */
+.hud-tilt {
+    position: absolute; z-index: 4; display: grid;
+    bottom: calc(env(safe-area-inset-bottom, 0px) + 28px); left: 50%; transform: translateX(-50%);
+    width: min(250px, 28vw); padding: 2px 8px; border-radius: 6px; background: var(--hud);
+    font-size: 11px; line-height: 1.4; color: var(--fg); font-variant-numeric: tabular-nums; white-space: nowrap;
+}
+.hud-tilt label { display: grid; grid-template-columns: 88px minmax(0, 1fr); align-items: center; gap: 6px; }
+.hud-tilt input { display: block; width: 100%; height: 22px; margin: 0; accent-color: var(--accent); }
+
+/* Top HUD: the clock and own bars on the left, the running combo in the
+   middle, the target on the right. Never takes touches. */
+.hud-top {
+    position: absolute; z-index: 3; pointer-events: none; left: 0; right: 0;
+    top: calc(env(safe-area-inset-top, 0px) + 8px);
+    padding-inline: calc(env(safe-area-inset-left, 0px) + 56px) calc(env(safe-area-inset-right, 0px) + 12px);
+    display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); align-items: start; gap: 12px;
+}
+.hud-self { display: flex; gap: 8px; align-items: flex-start; width: min(282px, 100%); }
+.hud-bars { display: grid; gap: 4px; flex: 1; min-width: 0; padding-top: 4px; }
+/* The clock (ui/hud.js): a sun for a dial, noon at the top. Round its rim
+   the day's light by the hour -- day, sunrise and sunset, night -- and a hand
+   that goes round once a day; the badge is the sun or the moon. */
+.hud-clock { flex: none; width: 54px; height: 54px; margin: -4px 0 0 -2px; filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.55)); }
+.hud-clock svg { display: block; width: 100%; height: 100%; overflow: visible; }
+.clock-rays { fill: #f2b544; stroke: #7a5310; stroke-width: 1.5; stroke-linejoin: round; }
+.clock-back { fill: #10141a; }
+.clock-ring path { fill: none; stroke-width: 8.5; }
+.clock-face { fill: #1b222c; stroke: #10141a; stroke-width: 1.5; }
+.clock-marks { fill: none; stroke: rgba(255, 255, 255, 0.45); stroke-width: 2.2; stroke-linecap: round; }
+.clock-hand { fill: #ffffff; stroke: #10141a; stroke-width: 1.4; stroke-linejoin: round; }
+.clock-pin { fill: #f2b544; stroke: #10141a; stroke-width: 1.4; }
+.badge-back { fill: #10141a; stroke: #f2b544; stroke-width: 2.4; }
+.badge-sun circle { fill: #ffd84a; }
+.badge-sun path { fill: none; stroke: #ffd84a; stroke-width: 2.2; stroke-linecap: round; }
+.badge-moon { fill: #c9d8ff; }
+.hud-clock[data-body="sun"] .badge-moon, .hud-clock[data-body="moon"] .badge-sun { display: none; }
+.bar { position: relative; height: 9px; border-radius: 3px; background: rgba(14, 18, 23, 0.55); overflow: hidden; box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.25); }
+.bar i { position: absolute; inset: 0 auto 0 0; width: 100%; transition: width 0.12s linear; }
+.bar-hp i { background: #6fcf5a; }
+.bar-guard { height: 6px; }
+.bar-guard i { background: #f2b544; }
+.bar-guard.locked i { background: #8a8f96; }
+.bar[hidden] { display: none; }
+.hud-target { justify-self: end; display: grid; gap: 4px; width: min(200px, 100%); justify-items: end; }
+.hud-target[hidden] { display: none; }
+.target-name { font-size: 12px; line-height: 1; color: var(--fg); text-shadow: 0 1px 2px rgba(0, 0, 0, 0.6); display: flex; gap: 6px; align-items: center; }
+.target-name b { font-weight: 400; }
+.target-rage { font-style: normal; font-size: 11px; padding: 1px 4px; border-radius: 3px; background: #c8433a; color: #fff; text-shadow: none; }
+.target-rage[hidden] { display: none; }
+.hud-goal { font-size: 12px; line-height: 1.2; color: var(--fg); text-shadow: 0 1px 2px rgba(0, 0, 0, 0.7); margin-top: 2px; }
+.hud-goal[hidden] { display: none; }
+
+/* Over each monster in a fight: a small HP bar, and "!" as it notices. */
+.hud-mobs { position: absolute; inset: 0; z-index: 2; pointer-events: none; overflow: hidden; }
+.mob { position: absolute; left: 0; top: 0; width: 52px; display: grid; justify-items: center; gap: 2px; }
+.mob[hidden] { display: none; }
+.mob-bar { width: 100%; height: 6px; border-radius: 3px; background: rgba(14, 18, 23, 0.6); box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.3); overflow: hidden; }
+.mob-bar i { display: block; height: 100%; width: 100%; background: #e05a4f; }
+.mob.enraged .mob-bar i { background: #ff3a24; }
+.mob-alert { font: 800 20px/1 var(--font); color: #ffd84a; text-shadow: 0 1px 3px rgba(0, 0, 0, 0.8); }
+.mob-alert[hidden] { display: none; }
+
+/* The menu key, top left; the pause and result panel. */
+.hud-menu {
+    position: absolute; z-index: 4; margin: 0; padding: 0; box-sizing: border-box;
+    left: calc(env(safe-area-inset-left, 0px) + 10px); top: calc(env(safe-area-inset-top, 0px) + 6px);
+    width: 36px; height: 36px; border-radius: 8px; display: flex; gap: 5px; align-items: center; justify-content: center;
+    border: 2px solid var(--ctl-line); background: var(--ctl-fill); cursor: pointer; touch-action: manipulation;
+}
+.hud-menu i { display: block; width: 4px; height: 14px; border-radius: 1px; background: var(--fg); }
+.hud-menu:focus { outline: none; }
+.hud-menu:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.panel { position: absolute; inset: 0; z-index: 8; display: grid; place-items: center; padding: 16px; background: rgba(10, 13, 17, 0.55); }
+.panel[hidden] { display: none; }
+.panel-card {
+    min-width: min(320px, 100%); max-width: 100%; max-height: 100%; overflow: auto; box-sizing: border-box;
+    padding: 16px 20px; border-radius: 10px; background: rgba(20, 25, 31, 0.94); box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.18);
+    display: grid; gap: 10px; text-align: center;
+}
+.panel-title { margin: 0; font-size: 22px; }
+.panel.win .panel-title { color: var(--accent); }
+.panel.lose .panel-title { color: #ff8a7a; }
+.panel-note { margin: 0; font-size: 13px; color: var(--muted); }
+.panel-note:empty { display: none; }
+.panel-stats { margin: 0; display: grid; grid-template-columns: repeat(3, auto); gap: 4px 16px; justify-content: center; font-size: 13px; }
+.panel-stats:empty { display: none; }
+.panel-stats div { display: flex; gap: 6px; }
+.panel-stats dt { color: var(--muted); }
+.panel-stats dd { margin: 0; font-variant-numeric: tabular-nums; }
+.panel-actions { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; }
+.panel-actions button {
+    min-width: 96px; min-height: 40px; padding: 0 14px; border-radius: 8px; font: 500 15px/1 var(--font);
+    border: 1px solid rgba(255, 255, 255, 0.35); background: rgba(255, 255, 255, 0.08); color: var(--fg); cursor: pointer;
+}
+.panel-actions button.primary { border-color: var(--accent); background: var(--accent); color: #1d1606; }
+.panel-actions button[hidden] { display: none; }
+.bar-target { width: 100%; }
+.bar-target i { background: #e05a4f; left: auto; right: 0; }
+.pips { display: flex; gap: 3px; }
+.pips[hidden] { display: none; }
+.pips i { width: 14px; height: 5px; border-radius: 2px; background: rgba(14, 18, 23, 0.55); box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.25); }
+.pips.many i { width: 10px; }
+.pips i.on { background: var(--accent); }
+.hud-target.reeling .pips i { background: #ffd84a; }
+.hud-combo { display: grid; justify-items: center; gap: 3px; opacity: 0; transition: opacity 0.25s; }
+.hud-combo.show { opacity: 1; transition: none; }
+.chips { display: flex; gap: 4px; }
+.chip { min-width: 22px; height: 22px; display: grid; place-items: center; border-radius: 4px; font: 600 13px/1 var(--font);
+    background: rgba(14, 18, 23, 0.55); color: var(--fg); box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.3); }
+.chip.on { background: var(--accent); color: #1d1606; box-shadow: none; }
+.chip.pause { min-width: 12px; background: none; box-shadow: none; color: var(--muted); }
+.move-name { font-size: 15px; line-height: 1.2; color: var(--fg); text-shadow: 0 1px 3px rgba(0, 0, 0, 0.7); min-height: 1.2em; }
+/* Damage numbers, placed by ui/hud.js. */
+.hud-floats { position: absolute; inset: 0; z-index: 2; pointer-events: none; overflow: hidden; }
+.float { position: absolute; left: 0; top: 0; font: 700 16px/1 var(--font); color: #ffffff; text-shadow: 0 1px 2px rgba(0, 0, 0, 0.8); white-space: nowrap; }
+.float.heavy { color: #ffd27a; font-size: 19px; }
+.float.hurt { color: #ff8a7a; }
+.float.block { color: #c9cfd5; font-size: 13px; }
+.float.parry { color: #ffe066; font-size: 15px; }
+
+/* The world: a tag over the interact key's target, the region's name (or a
+   boss down) in the middle of the screen, and what is picked up. */
+.hud-tag {
+    position: absolute; z-index: 2; left: 0; top: 0; pointer-events: none; display: grid; justify-items: center; gap: 1px;
+    padding: 3px 8px; border-radius: 6px; background: var(--hud); white-space: nowrap; text-align: center;
+}
+.hud-tag[hidden] { display: none; }
+.hud-tag b { font-size: 13px; font-weight: 600; }
+.hud-tag span { font-size: 11px; color: #ffb4a6; }
+.hud-tag span:empty { display: none; }
+/* A hold under way (mining, opening a chest): a ring fills over the target. */
+.hud-hold {
+    position: absolute; z-index: 2; left: 0; top: 0; width: 40px; height: 40px; border-radius: 50%; pointer-events: none; --hold: 0;
+    background: conic-gradient(var(--accent) calc(var(--hold) * 360deg), rgba(14, 18, 23, 0.55) 0);
+    -webkit-mask: radial-gradient(circle, transparent calc(50% - 6px), #000 calc(50% - 5.5px));
+    mask: radial-gradient(circle, transparent calc(50% - 6px), #000 calc(50% - 5.5px));
+    filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.6));
+}
+.hud-hold[hidden] { display: none; }
+.hud-region {
+    position: absolute; z-index: 3; pointer-events: none; left: 50%; top: 24%; transform: translate(-50%, -50%);
+    display: grid; justify-items: center; gap: 4px; text-align: center; white-space: nowrap;
+    text-shadow: 0 2px 6px rgba(0, 0, 0, 0.75); transition: opacity 0.5s;
+}
+.hud-region[hidden] { display: none; }
+.hud-region.fade { opacity: 0; }
+.hud-region b { font-size: 26px; font-weight: 700; letter-spacing: 0.08em; }
+.hud-region span { font-size: 13px; color: var(--muted); }
+.hud-region span:empty { display: none; }
+.hud-toasts {
+    position: absolute; z-index: 3; pointer-events: none; display: grid; gap: 4px; justify-items: start;
+    left: calc(env(safe-area-inset-left, 0px) + 56px); top: calc(env(safe-area-inset-top, 0px) + 66px);
+}
+.toast { font-size: 13px; padding: 2px 8px; border-radius: 4px; background: var(--hud); transition: opacity 0.5s; }
+.toast.fade { opacity: 0; }
+.target-boss { font-style: normal; font-size: 11px; padding: 1px 4px; border-radius: 3px; background: var(--accent); color: #1d1606; text-shadow: none; }
+.target-boss[hidden] { display: none; }
+.mob.boss { width: 80px; }
+.mob.boss .mob-bar { height: 8px; }
+
+/* A duel: the countdown in the middle, and an arrow on the screen's edge
+   towards the rival while it is in sight but off screen. */
+.hud-banner {
+    position: absolute; z-index: 3; pointer-events: none; left: 50%; top: 32%; transform: translate(-50%, -50%);
+    font: 800 64px/1 var(--font); color: #fff; text-shadow: 0 2px 8px rgba(0, 0, 0, 0.7);
+}
+.hud-banner.note { font-size: 26px; white-space: nowrap; }
+.hud-banner[hidden] { display: none; }
+.hud-arrow {
+    position: absolute; z-index: 3; pointer-events: none; left: 0; top: 0; width: 0; height: 0;
+    border-top: 11px solid transparent; border-bottom: 11px solid transparent; border-left: 20px solid #e0574b;
+    filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.6));
+}
+.hud-arrow[hidden] { display: none; }
+.panel-actions button:disabled { opacity: 0.55; cursor: default; }
+
+/* The room screen: a code to show or type, and a keypad beside it. */
+.room-card { grid-template-columns: minmax(0, 300px); align-items: center; }
+.room.keyed .room-card { grid-template-columns: minmax(0, 280px) auto; gap: 18px; }
+.room-main { display: grid; gap: 10px; }
+.room-weapons { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.room-weapons[hidden] { display: none; }
+.room-weapons button {
+    display: grid; grid-template-columns: auto 1fr; column-gap: 8px; align-items: center; text-align: left;
+    padding: 8px 10px; border-radius: 10px; border: 1px solid rgba(255, 255, 255, 0.18); background: rgba(255, 255, 255, 0.06); color: var(--fg);
+}
+.room-weapons button.on { border-color: var(--accent); background: rgba(255, 255, 255, 0.14); box-shadow: 0 0 0 1px var(--accent) inset; }
+.room-weapons .weapon-icon { grid-row: span 2; font-size: 22px; }
+.room-weapons b { font-size: 15px; }
+.room-weapons small { font-size: 11px; opacity: 0.75; }
+.room-code { display: flex; gap: 8px; justify-content: center; }
+.room-code[hidden] { display: none; }
+.room-code i {
+    width: 44px; height: 54px; display: grid; place-items: center; border-radius: 8px; font: 700 32px/1 var(--font); font-style: normal;
+    background: rgba(255, 255, 255, 0.06); box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.3); font-variant-numeric: tabular-nums;
+}
+.room-code i.next { box-shadow: 0 0 0 2px var(--accent); }
+.room-status { margin: 0; min-height: 1.3em; font-size: 13px; color: var(--fg); }
+.room-status.error { color: #ff8a7a; }
+.room-keys { display: grid; grid-template-columns: repeat(3, 56px); gap: 6px; }
+.room-keys[hidden] { display: none; }
+.room-keys button {
+    height: 46px; border-radius: 8px; border: 1px solid rgba(255, 255, 255, 0.3); background: rgba(255, 255, 255, 0.08);
+    color: var(--fg); font: 600 20px/1 var(--font); cursor: pointer; touch-action: manipulation; padding: 0;
+}
+.room-keys button[data-key="clear"] { font-size: 13px; }
+.room-keys button:active { background: rgba(255, 255, 255, 0.24); }
+.room-keys button:disabled { opacity: 0.4; }
+
+/* Item screens (bag, shop, smithy): landscape, a list on the left and the
+   picked item on the right. Built by ui/screens.js. */
+.screen {
+    position: absolute; inset: 0; z-index: 9; display: grid; place-items: center; box-sizing: border-box;
+    padding: calc(env(safe-area-inset-top, 0px) + 8px) calc(env(safe-area-inset-right, 0px) + 12px) calc(env(safe-area-inset-bottom, 0px) + 8px) calc(env(safe-area-inset-left, 0px) + 12px);
+    background: rgba(10, 13, 17, 0.6);
+}
+.screen[hidden] { display: none; }
+.screen-card {
+    width: min(780px, 100%); height: min(400px, 100%); box-sizing: border-box; overflow: hidden;
+    display: grid; grid-template-rows: auto minmax(0, 1fr); border-radius: 10px;
+    background: rgba(20, 25, 31, 0.96); box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.18);
+}
+.screen-head { display: flex; align-items: center; gap: 10px; padding: 8px 10px 8px 14px; border-bottom: 1px solid rgba(255, 255, 255, 0.12); }
+.screen-title { margin: 0; font-size: 18px; white-space: nowrap; }
+.screen-tabs { display: flex; gap: 6px; }
+.screen-tabs button, .screen-close {
+    min-height: 34px; padding: 0 14px; border-radius: 17px; font: 500 14px/1 var(--font); cursor: pointer;
+    border: 1px solid rgba(255, 255, 255, 0.3); background: rgba(255, 255, 255, 0.06); color: var(--fg); touch-action: manipulation;
+}
+.screen-tabs button.on { border-color: var(--accent); background: var(--accent); color: #1d1606; }
+.screen-gold { margin-left: auto; font-size: 14px; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.screen-close { border-radius: 8px; }
+.screen-body { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.15fr); min-height: 0; }
+.screen-list { list-style: none; margin: 0; padding: 6px; overflow-y: auto; border-right: 1px solid rgba(255, 255, 255, 0.12); display: grid; gap: 4px; align-content: start; }
+.screen-list .empty { padding: 14px; color: var(--muted); font-size: 13px; }
+.screen-list button {
+    width: 100%; min-height: 46px; padding: 4px 10px; box-sizing: border-box; border-radius: 8px; cursor: pointer; text-align: left;
+    display: grid; grid-template-columns: 30px minmax(0, 1fr) auto; grid-template-areas: "icon name tag" "icon sub tag"; column-gap: 8px; align-items: center;
+    border: 1px solid transparent; background: rgba(255, 255, 255, 0.05); color: var(--fg); font: 14px/1.25 var(--font); touch-action: manipulation;
+}
+.screen-list button.on { border-color: var(--accent); background: rgba(242, 181, 68, 0.12); }
+.screen-list button.dim { opacity: 0.6; }
+.row-icon { grid-area: icon; font-size: 20px; text-align: center; }
+.row-name { grid-area: name; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.row-sub { grid-area: sub; font-size: 12px; color: var(--muted); white-space: nowrap; }
+.row-tag { grid-area: tag; font-style: normal; font-size: 11px; padding: 2px 6px; border-radius: 4px; background: rgba(255, 255, 255, 0.12); white-space: nowrap; }
+.screen-detail { padding: 10px 14px; overflow-y: auto; display: grid; align-content: start; gap: 6px; font-size: 13px; }
+.screen-detail h3 { margin: 0 0 2px; font-size: 17px; display: flex; gap: 8px; align-items: center; }
+.screen-detail p { margin: 0; color: var(--fg); line-height: 1.45; }
+.screen-detail p + p { color: var(--muted); }
+.detail-stats { margin: 4px 0; display: flex; gap: 6px 16px; flex-wrap: wrap; }
+.detail-stats div { display: flex; gap: 6px; }
+.detail-stats dt { color: var(--muted); }
+.detail-stats dd { margin: 0; font-variant-numeric: tabular-nums; }
+.detail-stats b.up { color: #8be07a; } .detail-stats b.down { color: #ff8a7a; }
+.detail-needs { list-style: none; margin: 2px 0; padding: 0; display: grid; gap: 3px; }
+.detail-needs li.short b { color: #ff8a7a; } .detail-needs li.ok b { color: #8be07a; }
+.detail-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 4px; }
+.detail-actions button {
+    min-height: 42px; padding: 0 16px; border-radius: 8px; font: 500 15px/1 var(--font); cursor: pointer; touch-action: manipulation;
+    border: 1px solid rgba(255, 255, 255, 0.35); background: rgba(255, 255, 255, 0.08); color: var(--fg);
+}
+.detail-actions button.primary { border-color: var(--accent); background: var(--accent); color: #1d1606; }
+.detail-actions button:disabled { opacity: 0.45; cursor: default; }
+.detail-note { min-height: 1.3em; color: var(--accent) !important; }
+
+/* Stick: pressing anywhere in the bottom-left zone puts the stick there.
+   ui/input.js sizes the zone from game_config.js. */
+.stick-zone { position: absolute; left: 0; bottom: 0; width: 250px; height: 190px; z-index: 1; touch-action: none; }
+.stick {
+    --r: 52px; --x: 0px; --y: 0px;
+    position: absolute; left: 0; top: 0; z-index: 2; pointer-events: none;
+    width: calc(var(--r) * 2); height: calc(var(--r) * 2); border-radius: 50%;
+    transform: translate(calc(var(--x) - 50%), calc(var(--y) - 50%));
+    border: 2px solid var(--ctl-line); background: var(--ctl-fill);
+    opacity: 0.35; transition: opacity 0.12s;
+}
+.stick.active { opacity: 1; transition: none; }
+.stick-knob {
+    position: absolute; left: 50%; top: 50%; width: 46%; height: 46%;
+    margin: -23% 0 0 -23%; border-radius: 50%;
+    background: rgba(255, 255, 255, 0.8); box-shadow: 0 1px 4px rgba(0, 0, 0, 0.35);
+}
+
+/* Buttons: round, positioned and sized by ui/input.js. */
+.ctl {
+    position: absolute; z-index: 3; margin: 0; padding: 0; box-sizing: border-box;
+    display: grid; place-items: center; border-radius: 50%;
+    border: 2px solid var(--ctl-line); background: var(--ctl-fill); color: var(--fg);
+    font: 600 26px/1 var(--font); touch-action: none; cursor: pointer;
+    transition: transform 0.06s, background-color 0.06s;
+}
+.ctl.pressed { background: var(--ctl-pressed); transform: scale(0.94); }
+.ctl:focus { outline: none; }
+.ctl:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.ctl-attack { border-color: var(--accent); color: var(--accent); font-size: 22px; letter-spacing: 0.04em; }
+.ctl-guard svg { width: 52%; height: 52%; display: none; grid-area: 1 / 1; }
+.ctl-guard[data-kind="shield"] .icon-shield, .ctl-guard[data-kind="weapon"] .icon-blade { display: block; }
+.shield-face { fill: #8a5a2e; stroke: rgba(255, 255, 255, 0.85); stroke-width: 1.2; }
+.shield-band { fill: #c9cfd5; }
+.blade-steel { fill: #c9cfd5; stroke: rgba(255, 255, 255, 0.85); stroke-width: 0.6; } .blade-guard { fill: #8a5a2e; } .blade-grip { fill: #4a3a2a; }
+/* The offhand key: the torch or the potion, greyed with a shield or nothing. */
+.ctl-offhand svg { width: 52%; height: 52%; display: none; grid-area: 1 / 1; }
+.ctl-offhand[data-kind="torch"] .icon-torch, .ctl-offhand[data-kind="potion"] .icon-potion { display: block; }
+.torch-stick { fill: #8a5a2e; } .torch-head { fill: #4a3a2a; } .torch-flame { fill: rgba(255, 255, 255, 0.35); }
+.ctl-offhand.lit .torch-flame { fill: #ffb13b; }
+.potion-glass { fill: rgba(207, 230, 239, 0.35); stroke: rgba(255, 255, 255, 0.85); stroke-width: 1.1; } .potion-liquid { fill: #d8394a; }
+/* Potions left, on the offhand key. */
+.ctl-count {
+    position: absolute; right: -2px; top: -2px; min-width: 20px; height: 20px; padding: 0 5px; box-sizing: border-box; border-radius: 10px;
+    display: grid; place-items: center; font: 600 12px/1 var(--font); background: var(--accent); color: #1d1606;
+}
+.ctl-count[hidden] { display: none; }
+.ctl-interact { font-size: 14px; letter-spacing: 0.05em; white-space: nowrap; }
+.ctl.idle { opacity: 0.5; }
+.ctl-interact:not(.idle) { border-color: var(--accent); }
+.ctl-interact.blocked { border-color: var(--ctl-line); color: var(--muted); }
+.ctl.disabled { opacity: 0.28; filter: grayscale(1); cursor: default; }
+
+/* Portrait: cover everything and ask for landscape. */
+.rotate-hint {
+    position: absolute; inset: 0; z-index: 10; display: none;
+    place-content: center; justify-items: center; gap: 6px; padding: 24px;
+    background: var(--bg); text-align: center;
+}
+.rotate-title { margin: 14px 0 0; font-size: 20px; }
+.rotate-note { margin: 0; font-size: 14px; color: var(--muted); }
+.rotate-phone {
+    width: 38px; height: 64px; border: 3px solid var(--fg); border-radius: 8px;
+    animation: rotate-phone 2.4s ease-in-out infinite;
+}
+@keyframes rotate-phone { 0%, 25% { transform: rotate(0deg); } 55%, 100% { transform: rotate(-90deg); } }
+@media (prefers-reduced-motion: reduce) { .rotate-phone { animation: none; transform: rotate(-90deg); } }
+@media (orientation: portrait) { .rotate-hint { display: grid; } }
+
+/* The menu (ui/menu.js): a window of about 88% x 80% of the screen over
+   the running game, three columns -- the figure (its canvas,
+   render/figure_view.js); a page: the character's (HP and stats over the
+   gear slots, a column as in Minecraft, and the bag, the picked item
+   below) or the settings; the side with the pages' keys, pause, the room.
+   The close key stands apart in the corner. */
+.menu {
+    position: absolute; inset: 0; z-index: 9; display: grid; place-items: center; box-sizing: border-box;
+    padding: calc(env(safe-area-inset-top, 0px) + 6px) calc(env(safe-area-inset-right, 0px) + 8px) calc(env(safe-area-inset-bottom, 0px) + 6px) calc(env(safe-area-inset-left, 0px) + 8px);
+    background: rgba(10, 13, 17, 0.45);
+}
+.menu[hidden] { display: none; }
+.menu-card {
+    position: relative; width: min(88vw, 960px); height: min(80vh, 420px); max-width: 100%; max-height: 100%; box-sizing: border-box; overflow: hidden;
+    display: grid; grid-template-columns: minmax(110px, 0.72fr) minmax(0, 2fr) minmax(124px, 0.72fr);
+    border-radius: 10px; background: rgba(20, 25, 31, 0.96); box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.18);
+}
+.menu-figure {
+    position: relative; min-height: 0; overflow: hidden; touch-action: none; cursor: grab;
+    background: radial-gradient(ellipse at 50% 78%, rgba(120, 160, 210, 0.3), rgba(26, 32, 41, 0) 68%), #1a2029;
+    border-right: 1px solid rgba(255, 255, 255, 0.12);
+}
+.figure-canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+.menu-figure-note { position: absolute; left: 0; right: 0; bottom: 5px; margin: 0; text-align: center; font-size: 10px; color: var(--muted); pointer-events: none; }
+.menu-figure.none::after { content: '无法显示 3D 人物'; position: absolute; inset: 0; display: grid; place-items: center; color: var(--muted); font-size: 12px; }
+.menu-page { grid-column: 2; grid-row: 1; border-right: 1px solid rgba(255, 255, 255, 0.12); }
+.menu-page[hidden] { display: none; }
+.menu-gear {
+    --cell: clamp(30px, 9.5vh, 40px);
+    min-height: 0; min-width: 0; display: grid; grid-template-rows: auto auto minmax(0, 1fr) auto; gap: 5px; padding: 8px 9px 6px;
+}
+.menu-life { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 6px; align-items: center; font-size: 11px; font-variant-numeric: tabular-nums; }
+.menu-life > b { font-weight: 500; color: var(--muted); }
+.menu-life .bar { height: 9px; }
+.menu-stats { margin: 0; display: flex; align-items: center; gap: 12px; font-size: 12px; white-space: nowrap; }
+.menu-stats div { display: flex; gap: 4px; }
+.menu-stats dt { color: var(--muted); }
+.menu-stats dd { margin: 0; font-weight: 600; font-variant-numeric: tabular-nums; }
+.menu-stats .menu-gold { margin-left: auto; align-items: center; }
+/* Gear slots in a column on the left, the bag beside them. */
+.menu-pack { min-height: 0; display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 8px; }
+.menu-slots { display: grid; grid-auto-rows: max-content; gap: 4px; align-content: start; padding-right: 8px; border-right: 1px solid rgba(255, 255, 255, 0.1); }
+.slot { display: flex; align-items: center; gap: 5px; }
+.slot-name { font-size: 11px; color: var(--muted); white-space: nowrap; }
+.cell {
+    position: relative; width: var(--cell, 38px); height: var(--cell, 38px); box-sizing: border-box; padding: 3px; margin: 0; border-radius: 7px; flex: none;
+    display: grid; place-items: center; font: 19px/1 var(--font); color: var(--fg); cursor: pointer; touch-action: manipulation;
+    border: 1px solid rgba(255, 255, 255, 0.18); background: rgba(255, 255, 255, 0.06);
+}
+.cell.on { border-color: var(--accent); background: rgba(242, 181, 68, 0.16); box-shadow: 0 0 0 1px var(--accent) inset; }
+.cell.empty { cursor: default; font-size: 11px; color: var(--muted); border-style: dashed; }
+.cell .item-icon { width: 100%; height: 100%; object-fit: contain; display: grid; place-items: center; }
+.cell-count { position: absolute; right: 3px; bottom: 2px; font: 600 11px/1 var(--font); color: #fff; text-shadow: 0 1px 2px #000; }
+.menu-bag {
+    min-height: 0; overflow-y: auto; display: grid; grid-template-columns: repeat(auto-fill, var(--cell)); gap: 5px; align-content: start;
+    padding: 5px; border-radius: 8px; background: rgba(0, 0, 0, 0.22);
+}
+.bag-empty { grid-column: 1 / -1; margin: 6px; font-size: 12px; color: var(--muted); }
+/* The picked item: one line with its name, what it changes and the key; then what it is. */
+.menu-detail {
+    min-height: 36px; max-height: 72px; overflow-y: auto; display: grid; gap: 2px; align-content: start; font-size: 11px;
+    padding-top: 4px; border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+.menu-detail .detail-top { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.menu-detail h3 { margin: 0; font-size: 13px; display: flex; gap: 5px; align-items: center; white-space: nowrap; }
+.menu-detail h3 .item-icon { width: 20px; height: 20px; font-size: 16px; object-fit: contain; }
+.menu-detail .detail-compare { display: flex; flex-wrap: wrap; gap: 0 10px; color: var(--fg); min-width: 0; }
+.detail-compare b.up { color: #8be07a; }
+.detail-compare b.down { color: #ff8a7a; }
+.menu-detail p { margin: 0; line-height: 1.35; color: var(--muted); }
+.menu-detail .detail-actions { margin: 0 0 0 auto; flex-wrap: nowrap; }
+.menu-detail .detail-actions button { min-height: 30px; padding: 0 11px; font-size: 13px; white-space: nowrap; }
+.menu-detail .detail-note:empty { display: none; }
+.menu-detail .detail-note { color: var(--accent); }
+/* The side: the pages' keys well below the close key's corner, the one
+   shown lit; then pause; back to the title screen at the foot. */
+.menu-side { grid-column: 3; grid-row: 1; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 6px; padding: 56px 8px 8px; }
+.menu-side button {
+    flex: none; min-height: 34px; padding: 0 10px; border-radius: 8px; font: 500 14px/1 var(--font); cursor: pointer; touch-action: manipulation;
+    border: 1px solid rgba(255, 255, 255, 0.3); background: rgba(255, 255, 255, 0.07); color: var(--fg);
+}
+.menu-side button:disabled { opacity: 0.45; cursor: default; }
+.menu-tabs { display: grid; gap: 6px; padding-bottom: 8px; margin-bottom: 2px; border-bottom: 1px solid rgba(255, 255, 255, 0.12); }
+.menu-tabs button[aria-selected="true"] { border-color: var(--accent); background: rgba(242, 181, 68, 0.16); color: var(--accent); box-shadow: 0 0 0 1px var(--accent) inset; }
+/* The settings page (ui/settings_view.js; the menu's and the title
+   screen's): a row per setting, its choices side by side in four even
+   columns (the one in use lit); the picture quality's sliders under its
+   row, two a line. */
+.settings-page { min-height: 0; min-width: 0; overflow-y: auto; display: grid; gap: 6px; align-content: start; padding: 10px 12px 8px; }
+.setting-row { display: grid; grid-template-columns: 3.2em minmax(0, 1fr); gap: 8px; align-items: center; font-size: 13px; }
+.setting-name { color: var(--muted); }
+.choice { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 5px; }
+.choice button {
+    min-height: 30px; padding: 0 4px; border-radius: 7px; font: 500 13px/1 var(--font); white-space: nowrap; cursor: pointer; touch-action: manipulation;
+    border: 1px solid rgba(255, 255, 255, 0.22); background: rgba(255, 255, 255, 0.05); color: var(--muted);
+}
+.choice button[aria-checked="true"] { border-color: var(--accent); background: rgba(242, 181, 68, 0.16); color: var(--accent); font-weight: 600; }
+.sliders {
+    display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 4px 14px; margin: 0 0 2px calc(3.2em + 8px); padding: 2px 0 2px 8px;
+    border-left: 2px solid rgba(255, 255, 255, 0.12);
+}
+.slider { display: grid; gap: 1px; min-width: 0; font: 11px/1.25 var(--font); color: var(--muted); }
+.slider span { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 0 6px; }
+.slider b { font-weight: 600; color: var(--accent); }
+/* The track takes the finger, the input none: a drag up or down over it
+   scrolls the page (ui/menu.js). */
+.slider-track { display: block; touch-action: pan-y; cursor: pointer; }
+.slider input { display: block; width: 100%; height: 22px; margin: 0; accent-color: var(--accent); pointer-events: none; }
+.menu-side .menu-title { margin-top: auto; }
+.menu-close {
+    position: absolute; top: 9px; right: 9px; z-index: 1; width: 36px; height: 36px; margin: 0; padding: 0; border-radius: 50%;
+    display: grid; place-items: center; font: 600 17px/1 var(--font); cursor: pointer; touch-action: manipulation;
+    border: 1px solid var(--accent); background: var(--accent); color: #1d1606; box-shadow: 0 0 0 5px rgba(20, 25, 31, 0.96);
+}
+/* Item pictures (drawn from models) in the shop, smithy and room. */
+img.item-icon { object-fit: contain; vertical-align: middle; }
+.row-icon img.item-icon { width: 28px; height: 28px; }
+.screen-detail h3 img.item-icon { width: 26px; height: 26px; }
+.detail-needs img.item-icon, .screen-gold img.item-icon, .menu-gold .item-icon { width: 16px; height: 16px; font-size: 13px; }
+.room-weapons .weapon-icon img.item-icon { width: 30px; height: 30px; display: block; }
+
+/* The title screen (ui/title.js): over the base, dimmed most on the left
+   where the name and the keys stand; the settings unfold on the right.
+   The HUD and the controls are away under it (the frame-rate line stays). */
+.title {
+    position: absolute; inset: 0; z-index: 7; box-sizing: border-box;
+    display: grid; grid-template-columns: minmax(200px, 0.8fr) minmax(0, 1.2fr); gap: 16px; align-items: center;
+    padding: calc(env(safe-area-inset-top, 0px) + 12px) calc(env(safe-area-inset-right, 0px) + 16px) calc(env(safe-area-inset-bottom, 0px) + 12px) calc(env(safe-area-inset-left, 0px) + 32px);
+    background: linear-gradient(90deg, rgba(10, 13, 17, 0.88) 0%, rgba(10, 13, 17, 0.62) 42%, rgba(10, 13, 17, 0.3) 100%);
+}
+.title[hidden] { display: none; }
+/* The picture behind goes dark at each of the camera's cuts (ui/title.js `dim`). */
+.title-cut { position: absolute; inset: 0; z-index: -1; background: #05070a; opacity: 0; pointer-events: none; }
+.title-main { display: grid; gap: clamp(14px, 6vh, 28px); justify-items: start; min-width: 0; }
+.title-name {
+    margin: 0; font: 800 clamp(34px, 11vh, 52px)/1.05 var(--font); letter-spacing: 0.08em; color: var(--accent);
+    text-shadow: 3px 3px 0 #3a2508, 0 0 18px rgba(0, 0, 0, 0.6);
+}
+.title-keys { display: grid; gap: 8px; width: min(240px, 100%); }
+.title-keys button {
+    min-height: clamp(36px, 11vh, 44px); padding: 0 16px; border-radius: 8px; text-align: left; font: 500 16px/1 var(--font); cursor: pointer; touch-action: manipulation;
+    border: 1px solid rgba(255, 255, 255, 0.3); background: rgba(20, 25, 31, 0.78); color: var(--fg);
+}
+.title-keys button[hidden] { display: none; }
+.title-keys button.primary { border-color: var(--accent); background: var(--accent); color: #1d1606; font-weight: 600; }
+.title-keys button.danger { border-color: rgba(255, 128, 108, 0.65); color: #ffb4a6; }
+.title-keys button[aria-expanded="true"] { border-color: var(--accent); color: var(--accent); box-shadow: 0 0 0 1px var(--accent) inset; }
+.title-settings {
+    justify-self: end; width: min(100%, 470px); max-height: 100%; box-sizing: border-box;
+    border-radius: 10px; background: rgba(20, 25, 31, 0.96); box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.18);
+}
+.title-settings[hidden] { display: none; }
+.game.at-title .hud-top, .game.at-title .hud-menu, .game.at-title .ctl, .game.at-title .stick, .game.at-title .stick-zone,
+.game.at-title .hud-mobs, .game.at-title .hud-floats, .game.at-title .hud-banner, .game.at-title .hud-region, .game.at-title .hud-tag,
+.game.at-title .hud-hold, .game.at-title .hud-toasts, .game.at-title .hud-arrow, .game.at-title .hud-tilt { visibility: hidden; }

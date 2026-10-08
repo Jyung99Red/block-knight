@@ -1,0 +1,4 @@
+# Local tooling launchers (Windows entry points for committing/pushing and for
+# starting Claude Code). Kept on disk for convenience, never part of the game.
+Git-Menu.*
+cc.cmd

@@ -1,0 +1,86 @@
+<div class="map" id="map">
+    <section class="map-main">
+        <div class="map-readbar">
+            <output class="map-readout" data-readout></output>
+            <input type="text" class="map-ref" data-ref readonly spellcheck="false" placeholder="点一格或拖一块，这里出坐标" aria-label="选中的坐标">
+            <button type="button" class="primary" data-copy>复制</button>
+            <span class="map-note" data-copied></span>
+        </div>
+        <div class="map-stage" data-stage>
+            <div class="map-sheet" data-sheet>
+                <div class="map-top">
+                    <div class="map-corner" title="上边是列号（西 → 东），左边是行号（北 → 南）">列 行</div>
+                    <canvas data-ruler="top"></canvas>
+                </div>
+                <div class="map-body">
+                    <canvas class="map-ruler-left" data-ruler="left"></canvas>
+                    <div class="map-board" data-board>
+                        <canvas data-canvas></canvas>
+                        <canvas class="map-over" data-over></canvas>
+                    </div>
+                </div>
+            </div>
+            <div class="map-world" data-world hidden><canvas data-world-canvas></canvas></div>
+            <p class="map-error" data-error hidden></p>
+        </div>
+    </section>
+    <aside class="map-side">
+        <header class="map-head">
+            <h1>地图预览 <small>只看不改</small></h1>
+            <a href="index.html">回到游戏</a>
+        </header>
+
+        <section class="map-box">
+            <div class="map-row"><span class="map-label">地图</span><select data-map></select></div>
+            <div class="map-row">
+                <span class="map-label">格子</span>
+                <input type="range" data-zoom min="6" max="48" step="1">
+                <span class="map-value" data-zoom-text></span>
+                <button type="button" data-fit>适应窗口</button>
+            </div>
+            <div class="map-row">
+                <span class="map-label">点按</span>
+                <div class="map-tabs" data-tools>
+                    <button type="button" data-tool="select">选格 / 拖框</button>
+                    <button type="button" data-tool="measure">量距离</button>
+                    <button type="button" data-tool="pan">拖动地图</button>
+                </div>
+            </div>
+            <p class="map-note" data-tool-note></p>
+        </section>
+
+        <section class="map-box">
+            <h2>显示</h2>
+            <div class="map-checks">
+                <label><input type="checkbox" data-show="monsters"> 怪物：位置、警戒圈、追击圈</label>
+                <label><input type="checkbox" data-show="portals"> 传送门：去哪、过来站哪</label>
+                <label><input type="checkbox" data-show="marks"> 建筑、宝箱、出生点、木桩</label>
+                <label><input type="checkbox" data-show="screen"> 一屏范围（手机横屏看得到的地面，跟着指针）</label>
+                <label><input type="checkbox" data-show="grid"> 网格线</label>
+            </div>
+        </section>
+
+        <section class="map-box">
+            <h2>量距离 <small>选"量距离"，点起点再点终点</small></h2>
+            <p class="map-result" data-measure></p>
+        </section>
+
+        <section class="map-box">
+            <h2>这张地图</h2>
+            <div class="map-info" data-info></div>
+        </section>
+
+        <section class="map-box">
+            <h2>图例</h2>
+            <div class="map-legend" data-legend></div>
+            <ul class="map-notes">
+                <li>坐标是（列, 行）：列从西边 0 往东数，行从北边 0 往南数；上边和左边的尺子每 5 格标一个数。</li>
+                <li><b>整格深色带边框</b>的方块挡视线（高 2 以上的石墙、树、建筑、枯木丛）；<b>地面上的小方块</b>是矮障碍（高 1 的石头、矿）：挡路、挡招，不挡视线。石墙上的数字是高度。</li>
+                <li>怪物的<b>实线圈</b>是警戒范围（走进去会被发现；隔着挡视线的方块它看不见你），<b>虚线圈</b>是追击范围（怪离家超过这么远、你又出了警戒圈，它就回家）。</li>
+                <li>传送门旁的小圈是从那边过来时站的位置。</li>
+                <li>走路距离按格子算（可以斜走，不能擦着方块的角斜穿），实际会略短一点。</li>
+                <li><b>总览</b>把所有地图按传送门的方向摆在一张纸上（游戏里它们各自独立，靠传送门切换）：门从哪边出去，那张图就摆在哪边。连线是一对传送门，虚线是要先打倒首领的，粉色是两头方向对不上的。</li>
+            </ul>
+        </section>
+    </aside>
+</div>

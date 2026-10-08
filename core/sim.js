@@ -1,0 +1,193 @@
+// The world simulation: plain data advanced in fixed steps. It knows the
+// five controls (move stick, A, B, offhand, interact) and nothing about the
+// screen. Every value is serialisable except `terrain` and `rigs`, which are
+// shared data derived from the map and the models. The fighters' rules are
+// in core/fighter.js; everything else in the world is an entity
+// (core/entity.js): the training dummy, monsters, buildings, portals,
+// chests and drops. `events` is what happened, for sounds and effects to
+// read and drain.
+//
+// `fighters` are the people playing: one in PVE ('player'), two in a duel
+// ('host' and 'guest', design.md 8). sim.player, sim.input and
+// sim.stats are the first fighter's own; sim.monsters and sim.dummy are the
+// entities of those types (getters, left out of snapshots).
+// `region` is the map's key in gameConfig.maps; `progress` the world's
+// progress carried between regions (core/save.js: bosses down, chests
+// opened, what is carried), never part of a duel's snapshot.
+// `result` is null until the fight is decided. PVE: { outcome: 'lose'
+// (the player down), at }; a duel: { winner: 'host' | 'guest' | null (both
+// fell in the same step), at, conceded? }.
+const worldSim = (() => {
+    const BUTTONS = fighterKit.BUTTONS;
+    const DUEL_IDS = Object.freeze(['host', 'guest']);
+    const FIRST = {
+        player: { get: s => s.fighters[0] }, input: { get: s => s.fighters[0].input }, stats: { get: s => s.fighters[0].stats },
+        dummy: { get: s => s.entities.find(e => e.type === 'dummy') || null },
+        // Setting the list replaces every monster (tests keep only some).
+        monsters: { get: s => s.entities.filter(e => e.type === 'monster'), set: (s, list) => { s.entities = [...s.entities.filter(e => e.type !== 'monster'), ...list]; } }
+    };
+    function aliases(sim) {
+        for (const [key, { get, set }] of Object.entries(FIRST)) {
+            Object.defineProperty(sim, key, { get() { return get(this); }, set: set ? function (v) { set(this, v); } : undefined, enumerable: false, configurable: true });
+        }
+        return sim;
+    }
+    const regionOf = map => Object.keys(gameConfig.maps).find(id => gameConfig.maps[id] === map) || '';
+
+    // A world for map `region` (a key of gameConfig.maps; or `map` itself).
+    // progress: the save (core/save.js) -- bosses down stay down, opened
+    // chests stay open, saved terrain edits are put back. arrival: the region
+    // just left, to stand at the portal back there (else the map's spawn).
+    // carry: { hp } brought along. seed: the world's dice. spot: { x, y,
+    // facing } to stand at instead (the base rebuilt after a change of gear).
+    // loadout: the gear worn (else the save's, else the starter gear); the
+    // fighter's stats are the base plus that gear (core/inventory.js).
+    // A duel puts one fighter on each of the map's first two spawns, each
+    // facing the other; `loadouts` are their gear, [host, guest] (each one
+    // picked from duelKit's fair sets; the starter gear when left out),
+    // and `dayFrom` the hour it is played at, as seconds into the day
+    // (core/daytime.js).
+    function create({ map = null, region = null, progress = null, arrival = null, carry = null, spot = null, seed = 1, loadout = null, duel = false, loadouts = null, dayFrom = 0 } = {}) {
+        if (!map) map = gameConfig.maps[region || 'clearing'];
+        if (!map) throw new Error(`Unknown map ${region}`);
+        region = region || regionOf(map);
+        const terrain = terrainKit.fromRows(map.rows, gameConfig.world.unitsPerBlock, map.floor || '.');
+        if (duel && terrain.spawns.length < 2) throw new Error('A duel needs a map with two spawns');
+        if (duel) progress = null;
+        loadout = { ...(duel ? inventoryKit.starter() : loadout || progress?.loadout || inventoryKit.starter()) };
+        if (progress?.edits?.[region]) terrainKit.applyEdits(terrain, progress.edits[region]);
+        propKit.regrow(terrain, progress, region);
+        const ids = duel ? DUEL_IDS : ['player'];
+        const gear = ids.map((_, i) => ({ ...(duel ? loadouts?.[i] || inventoryKit.starter() : loadout) }));
+        // Each fighter's skeleton carries its own gear (the blade decides reach).
+        const rigOf = g => rigKit.build(playerModel, { scale: gameConfig.models.playerScale, equipment: equipmentModels.forLoadout(g) });
+        const spots = ids.map((_, i) => terrainKit.cellCentre(terrain, terrain.spawns[i].col, terrain.spawns[i].row));
+        const entry = duel ? null : spot || (arrival ? propKit.arrival(map, terrain, arrival) : null);
+        if (entry) spots[0] = entry;
+        const fighters = ids.map((id, i) => {
+            const at = spots[i], other = spots[1 - i];
+            return fighterKit.init({
+                x: at.x, y: at.y, h: space.groundHeight(at.x, at.y),
+                facing: duel ? Math.atan2(other.y - at.y, other.x - at.x) : entry ? entry.facing : Math.PI / 2, radius: gameConfig.player.radius,
+                // gait: walk/run cycle phase, in cycles. pace: share of the
+                // walking speed built up from a standstill. moveTime: seconds
+                // of unbroken walking, which turns into a run.
+                speed: 0, pace: 0, gait: 0, moveBlend: 0, runBlend: 0, moveTime: 0,
+                loadout: { ...gear[i] }
+            }, { id, endless: !duel && !!map.training, stats: inventoryKit.statsOf(gear[i]) });
+        });
+        if (carry && Number.isFinite(carry.hp)) fighters[0].hp = Math.max(1, Math.min(fighters[0].maxHp, Math.round(carry.hp)));
+        const saved = progress || {};
+        // clock: seconds played (outside duels), which grows resources back.
+        const world = {
+            bosses: { ...saved.bosses }, revived: { ...saved.revived }, chests: { ...saved.chests },
+            inventory: { gold: saved.inventory?.gold || 0, items: { ...saved.inventory?.items } }, loadout: { ...loadout },
+            clock: saved.clock || 0, gathered: { ...saved.gathered }
+        };
+        const dummy = dummyKit.create(terrain, map.dummyFacing ?? Math.PI);
+        // A boss once down stays down, till its grave calls it back.
+        const monsters = terrain.monsters.map((spawn, i) => monsterKit.create(terrain, spawn, i)).filter(m => !(m.boss && world.bosses[m.kind] && !world.revived[m.kind]));
+        const kinds = [...new Set(terrain.monsters.map(m => m.kind))];
+        return aliases({
+            time: 0, tick: 0, terrain, map: map.name || '', region, duel, seed: seed >>> 0, serial: 0, dayFrom: duel ? dayFrom : 0,
+            rigs: { fighters: Object.fromEntries(ids.map((id, i) => [id, rigOf(gear[i])])), dummy: dummy ? dummyKit.rig() : null, monsters: Object.fromEntries(kinds.map(k => [k, monsterKit.rig(k)])) },
+            fighters, entities: [...(dummy ? [dummy] : []), ...monsters, ...propKit.place(map, terrain, saved, region)],
+            progress: world, events: [], result: null
+        });
+    }
+
+    // Commands from the input layer or the network, for fighter `who`
+    // (index, the first by default): { type: 'move', x, y } with
+    // |(x, y)| <= 1 on the ground plane; { type: 'press' | 'release', button }.
+    // Returns whether it was taken.
+    function command(sim, cmd, who = 0) {
+        const p = sim.fighters[who];
+        if (!p || !cmd || typeof cmd !== 'object') return false;
+        if (cmd.type === 'move') {
+            if (!Number.isFinite(cmd.x) || !Number.isFinite(cmd.y)) return false;
+            const len = Math.hypot(cmd.x, cmd.y), k = len > 1 ? 1 / len : 1;
+            p.input.move = { x: cmd.x * k, y: cmd.y * k };
+            return true;
+        }
+        if (cmd.type === 'press' || cmd.type === 'release') {
+            const b = Object.hasOwn(p.input.buttons, cmd.button) ? p.input.buttons[cmd.button] : null;
+            if (!b) return false;
+            if (cmd.type === 'press') {
+                if (b.held) return false;
+                b.held = true; b.presses++;
+                fighterKit.press(sim, p, cmd.button);
+                return true;
+            }
+            if (!b.held) return false;
+            b.held = false;
+            fighterKit.release(sim, p, cmd.button);
+            return true;
+        }
+        return false;
+    }
+
+    // The nearest fighter still standing, or null.
+    function nearestFighter(sim, from) {
+        let best = null, far = Infinity;
+        for (const f of sim.fighters) {
+            const d = Math.hypot(f.x - from.x, f.y - from.y);
+            if (!f.down && d < far) { far = d; best = f; }
+        }
+        return best;
+    }
+
+    // One step. `judge` false: swings pass through and nothing is decided
+    // (a duel's guest predicting between the host's snapshots).
+    function step(sim, dt, { judge = true } = {}) {
+        sim.time += dt; sim.tick++;
+        if (!sim.duel && sim.progress) sim.progress.clock += dt;
+        for (const f of sim.fighters) fighterKit.tick(sim, f, dt);
+        fighterKit.settle(sim, judge);
+        entityKit.tick(sim, dt);
+        for (const f of sim.fighters) f.h = space.groundHeight(f.x, f.y);
+        if (!sim.result && judge) decide(sim);
+    }
+    function decide(sim) {
+        if (sim.duel) {
+            const up = sim.fighters.filter(f => !f.down);
+            if (up.length > 1) return;
+            sim.result = { winner: up[0]?.id ?? null, at: sim.time };
+            combatKit.emit(sim, 'result', { winner: sim.result.winner });
+            return;
+        }
+        // A world has no end to win; falling is the one way a trip ends.
+        if (sim.player.down) { sim.result = { outcome: 'lose', at: sim.time }; combatKit.emit(sim, 'result', { outcome: 'lose' }); }
+    }
+    // A duel given up by fighter `id`: the other one wins.
+    function concede(sim, id) {
+        if (!sim.duel || sim.result || !DUEL_IDS.includes(id)) return false;
+        sim.result = { winner: DUEL_IDS.find(other => other !== id), at: sim.time, conceded: id };
+        combatKit.emit(sim, 'result', { winner: sim.result.winner, conceded: id });
+        return true;
+    }
+    // How the fight ended for fighter `id`: 'win' | 'lose' | 'draw', or null.
+    function outcome(sim, id = 'player') {
+        const r = sim.result;
+        if (!r) return null;
+        if (!sim.duel) return r.outcome;
+        return r.winner === null ? 'draw' : r.winner === id ? 'win' : 'lose';
+    }
+
+    // The state as plain data (what a duel's host sends), and back. A
+    // snapshot has everything but the terrain, the rigs, the progress and
+    // the events; restoring keeps the world it is written into.
+    const STATIC = new Set(['terrain', 'rigs', 'events', 'progress']);
+    function snapshot(sim) {
+        const out = {};
+        for (const [key, value] of Object.entries(sim)) if (!STATIC.has(key)) out[key] = value;
+        return JSON.parse(JSON.stringify(out));
+    }
+    function restore(sim, snap) {
+        const copy = JSON.parse(JSON.stringify(snap));
+        for (const key of Object.keys(sim)) if (!STATIC.has(key)) sim[key] = copy[key];
+        return sim;
+    }
+    // Take the events since the last call.
+    function drain(sim) { return sim.events.splice(0); }
+    return { BUTTONS, DUEL_IDS, create, command, nearestFighter, step, concede, outcome, snapshot, restore, drain };
+})();

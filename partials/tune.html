@@ -1,0 +1,155 @@
+<div class="tune" id="tune">
+    <section class="tune-stage">
+        <div class="tune-view" data-view>
+            <canvas class="tune-canvas" data-canvas></canvas>
+            <div class="tune-fallback" data-fallback hidden></div>
+            <div class="tune-views" data-views></div>
+            <div class="tune-toggles">
+                <label><input type="checkbox" data-show="ghosts"> 残影 a / b</label>
+                <label><input type="checkbox" data-show="trails"> 剑的轨迹</label>
+                <label><input type="checkbox" data-show="boxes"> 判定框</label>
+                <label><input type="checkbox" data-follow> 镜头跟着人</label>
+            </div>
+            <p class="tune-help">拖动转视角 · 右键或 Shift 拖动平移 · 滚轮缩放 · 点身体选骨头<br>空格 播放/暂停 · ← → 逐帧（Shift 十帧）· 1 / 2 切关键姿势 · Ctrl+Z 撤销 · Ctrl+Y 重做</p>
+        </div>
+        <div class="tune-timeline">
+            <div class="tune-transport">
+                <button type="button" data-act="start" title="回到开头（Home）">⏮</button>
+                <button type="button" data-act="back" title="后退一帧（←）">‹</button>
+                <button type="button" data-act="play" class="primary" title="播放 / 暂停（空格）">▶</button>
+                <button type="button" data-act="forward" title="前进一帧（→）">›</button>
+                <label>速度
+                    <select data-speed>
+                        <option value="0.05">0.05×</option>
+                        <option value="0.1">0.1×</option>
+                        <option value="0.25">0.25×</option>
+                        <option value="0.5">0.5×</option>
+                        <option value="1">1×</option>
+                    </select>
+                </label>
+                <label><input type="checkbox" data-loop> 循环</label>
+                <span class="tune-readout" data-readout></span>
+            </div>
+            <div class="tune-track" data-track>
+                <div class="tune-lanes" data-lanes></div>
+                <div class="tune-playhead" data-playhead></div>
+            </div>
+            <div class="tune-legend-phases">
+                <span class="ph ph-windup">前摇</span><span class="ph ph-charge">蓄力</span><span class="ph ph-swing">挥动（判定）</span><span class="ph ph-recover">后摇</span>
+                <span class="ph-mark">◆ 关键姿势</span><span class="ph-hit">命中</span>
+            </div>
+        </div>
+    </section>
+    <aside class="tune-side">
+        <header class="tune-head">
+            <h1>动作调试 <small>方块骑士</small></h1>
+            <a href="index.html">回到游戏</a>
+        </header>
+
+        <section class="tune-box tune-notice" data-notice hidden>
+            <p data-notice-text></p>
+            <div class="tune-row">
+                <button type="button" data-notice="keep">知道了，用文件里的</button>
+                <button type="button" data-notice="restore">还是套用我上次的草稿</button>
+            </div>
+        </section>
+
+        <section class="tune-box">
+            <div class="tune-row"><span class="tune-label">武器</span><div class="tune-tabs" data-types></div></div>
+            <div class="tune-row">
+                <span class="tune-label">副手</span>
+                <select data-offhand>
+                    <option value="wooden_shield">木盾</option>
+                    <option value="">空手</option>
+                    <option value="torch">火把</option>
+                    <option value="potion">药水</option>
+                </select>
+            </div>
+            <div class="tune-row">
+                <span class="tune-label">预览</span>
+                <div class="tune-tabs" data-modes>
+                    <button type="button" data-mode="single">单招</button>
+                    <button type="button" data-mode="combo">连段</button>
+                    <button type="button" data-mode="pose">其他姿势</button>
+                </div>
+            </div>
+        </section>
+
+        <section class="tune-box" data-panel="single">
+            <h2>招式 <small>从站姿出这一招</small></h2>
+            <div class="tune-grid" data-moves></div>
+        </section>
+
+        <section class="tune-box" data-panel="combo">
+            <h2>连段 <small>按真的派生时机连着出（下一招在派生点立刻接上）</small></h2>
+            <div class="tune-routes" data-routes></div>
+            <div class="tune-route" data-route></div>
+            <div class="tune-row">
+                <button type="button" data-input="a">+ A</button>
+                <button type="button" data-input="b">+ B</button>
+                <button type="button" data-input="p" title="后摇放完、过了停顿线再按 A">+ · A</button>
+                <button type="button" data-input="pop">退一步</button>
+                <button type="button" data-input="clear">清空</button>
+            </div>
+            <div class="tune-row" data-hold-row>
+                <span class="tune-label">起手 B</span>
+                <input type="range" data-hold min="0.2" max="2.6" step="0.05">
+                <span class="tune-value" data-hold-text></span>
+            </div>
+        </section>
+
+        <section class="tune-box" data-panel="pose">
+            <h2>其他姿势</h2>
+            <div class="tune-grid" data-poses></div>
+        </section>
+
+        <section class="tune-box" data-target-box>
+            <div class="tune-row">
+                <label><input type="checkbox" data-target> 训练木桩</label>
+                <input type="range" data-distance min="20" max="140" step="1">
+                <span class="tune-value" data-distance-text></span>
+                <button type="button" data-standard>标准距离</button>
+            </div>
+        </section>
+
+        <section class="tune-box tune-edit">
+            <h2 data-editing></h2>
+            <div class="tune-tabs" data-keys>
+                <button type="button" data-key="a">a：前摇结束</button>
+                <button type="button" data-key="b">b：挥完</button>
+            </div>
+            <p class="tune-legend">选中骨头时画面上的 <b class="ax-x">红</b>/<b class="ax-y">绿</b>/<b class="ax-z">蓝</b> 线是它自己的 x / y / z（Blender 的 Local），永远互相垂直。
+                每根骨头下面"绕自身轴"的 X / Y / Z 按住左右拖，就是绕这三根线转，什么角度都摆得到；三个数会一起变，这是正常的。</p>
+            <p class="tune-legend">rx / ry / rz 是欧拉角，一层套一层：先转 ry，再 rx，最后 rz（Blender 的 ZXY 欧拉）。单位弧度，1 ≈ 57°，π ≈ 3.14。
+                所以滑块绕的不是那三根线：鼠标放到滑块上，画面上的虚线才是它绕着转的轴。rx 接近 ±1.57 时 ry 和 rz 的虚线几乎重合，少一个方向，这时用"绕自身轴"。
+                左右拖通道名（rx / ry / rz）可以微调，按住 Shift 更细；数字框里可以用 ↑ ↓；改过的数旁边点"原 … ↺"还原这一个数。</p>
+            <div data-bones></div>
+        </section>
+
+        <section class="tune-box" data-timing-box>
+            <h2>节奏 <small>game_config.js · 秒</small></h2>
+            <div data-timing></div>
+        </section>
+
+        <section class="tune-box" data-checks-box>
+            <h2>体检 <small>和 tests/hits.test.cjs 的量法一样：从站姿出招、不算踏步</small></h2>
+            <dl class="tune-checks" data-checks></dl>
+        </section>
+
+        <section class="tune-box">
+            <h2>导出</h2>
+            <div class="tune-row">
+                <button type="button" class="primary" data-copy="all">复制全部改动</button>
+                <button type="button" data-copy="this">只复制这一项</button>
+                <span class="tune-value" data-copied></span>
+            </div>
+            <textarea data-export readonly spellcheck="false"></textarea>
+            <div class="tune-row">
+                <button type="button" data-revert="this">还原这一项</button>
+                <button type="button" data-revert="all">全部还原</button>
+            </div>
+            <p class="tune-note">改动只在这个页面里生效，浏览器会记住草稿（刷新不丢）。复制以后贴给 Claude 写回文件、跑测试，游戏里才会变。
+                每次打开都读文件里最新的数；草稿里和文件一样的项会自动清掉，文件在你调过之后又被改过的项以文件为准（会提示）。</p>
+        </section>
+    </aside>
+</div>

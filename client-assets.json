@@ -1,0 +1,131 @@
+{
+  "game": {
+    "modules": {
+      "THREE": "vendor/three/three.module.min.js"
+    },
+    "styles": [
+      "style.css"
+    ],
+    "scripts": [
+      "game_config.js",
+      "core/math3d.js",
+      "core/space.js",
+      "core/rig.js",
+      "models/palette.js",
+      "models/player.js",
+      "models/equipment.js",
+      "models/player_poses.js",
+      "models/player_moves.js",
+      "models/dummy.js",
+      "models/goblin.js",
+      "models/wolf.js",
+      "models/spider.js",
+      "models/props.js",
+      "core/player_anim.js",
+      "core/inventory.js",
+      "core/terrain.js",
+      "core/entity.js",
+      "core/combat.js",
+      "core/fighter.js",
+      "core/dummy.js",
+      "core/monster.js",
+      "core/props.js",
+      "core/interact.js",
+      "core/daytime.js",
+      "core/sim.js",
+      "core/save.js",
+      "core/loop.js",
+      "core/duel.js",
+      "core/controls.js",
+      "render/textures.js",
+      "render/terrain_light.js",
+      "render/terrain_mesh.js",
+      "render/effects.js",
+      "render/lamp_view.js",
+      "render/view_shaders.js",
+      "render/view_light.js",
+      "render/view_bodies.js",
+      "render/view_props.js",
+      "render/view_sight.js",
+      "render/world_view.js",
+      "render/figure_view.js",
+      "vendor/peerjs/peerjs.min.js",
+      "net/link.js",
+      "ui/sfx.js",
+      "ui/settings.js",
+      "ui/hud.js",
+      "ui/input.js",
+      "ui/room.js",
+      "ui/screens.js",
+      "ui/settings_view.js",
+      "ui/menu.js",
+      "ui/title.js",
+      "ui/app.js"
+    ],
+    "partials": [
+      "game"
+    ]
+  },
+  "tune": {
+    "modules": {
+      "THREE": "vendor/three/three.module.min.js"
+    },
+    "styles": [
+      "tune/tune.css"
+    ],
+    "scripts": [
+      "game_config.js",
+      "core/math3d.js",
+      "core/space.js",
+      "core/rig.js",
+      "models/palette.js",
+      "models/player.js",
+      "models/equipment.js",
+      "models/player_poses.js",
+      "models/player_moves.js",
+      "models/dummy.js",
+      "models/goblin.js",
+      "models/wolf.js",
+      "models/spider.js",
+      "models/props.js",
+      "core/player_anim.js",
+      "core/inventory.js",
+      "core/terrain.js",
+      "core/entity.js",
+      "core/combat.js",
+      "core/fighter.js",
+      "core/dummy.js",
+      "core/monster.js",
+      "core/props.js",
+      "core/interact.js",
+      "core/daytime.js",
+      "core/sim.js",
+      "core/save.js",
+      "core/loop.js",
+      "core/duel.js",
+      "core/controls.js",
+      "render/textures.js",
+      "tune/lab.js",
+      "tune/view.js",
+      "tune/panel.js"
+    ],
+    "partials": [
+      "tune"
+    ]
+  },
+  "map": {
+    "styles": [
+      "mapview/map.css"
+    ],
+    "scripts": [
+      "game_config.js",
+      "core/terrain.js",
+      "core/props.js",
+      "mapview/plan.js",
+      "mapview/page.js"
+    ],
+    "partials": [
+      "map"
+    ]
+  }
+}
