@@ -431,8 +431,8 @@ test('the world: the title screen, the base, through the north gate by touch, a 
             // Sight (user, 2026-10-04): with the player's back to it, the
             // goblin and its warning are not drawn; facing it again they are.
             // (From past the ring round the player, where it sees whichever
-            // way it faces: player.sightNear.)
-            p.x = m.x - gameConfig.player.sightNear - 40; p.y = m.y;
+            // way it faces: player.sight.day.near.)
+            p.x = m.x - gameConfig.player.sight.day.near - 40; p.y = m.y;
             p.facing = Math.PI; g.view.render(s, 0.016);
             const behind = { seen: g.view.seen(m.id), warning: !!shown() };
             p.facing = 0; g.view.render(s, 0.016);

@@ -162,17 +162,18 @@ const combatKit = (() => {
     // Is `from` within the guard's front arc of `body`?
     function inFront(body, from) { return inArc(body, from, C().guard.frontAngle); }
     // Does the fighter `body` see `other` (a rival, a monster, the dummy)?
-    // Only ahead of it (within player.sightAngle of where it faces) or
-    // right by it (any part of the other within player.sightNear, behind
-    // it too: user, 2026-10-04), with no block that hides between. The
-    // other's middle or either edge of it, as seen from here, will do: a
-    // big body half round a corner shows.
-    function sees(terrain, body, other) {
-        const P = gameConfig.player, dx = other.x - body.x, dy = other.y - body.y, d = Math.hypot(dx, dy), r = d > 1e-6 ? (other.radius || 0) / d : 0;
-        const near = d - (other.radius || 0) <= P.sightNear;
+    // Only ahead of it (within `sight.angle` of where it faces) or right
+    // by it (any part of the other within `sight.near`, behind it too:
+    // user, 2026-10-04), with no block that hides between. `sight`: what
+    // it sees at the hour ({ angle, near }: dayKit.sight; by day if not
+    // given). The other's middle or either edge of it, as seen from
+    // here, will do: a big body half round a corner shows.
+    function sees(terrain, body, other, sight = gameConfig.player.sight.day) {
+        const dx = other.x - body.x, dy = other.y - body.y, d = Math.hypot(dx, dy), r = d > 1e-6 ? (other.radius || 0) / d : 0;
+        const near = d - (other.radius || 0) <= sight.near;
         for (const side of r ? [0, 1, -1] : [0]) {
             const at = { x: other.x - dy * r * side, y: other.y + dx * r * side };
-            if ((near || inArc(body, at, P.sightAngle)) && terrainKit.sightClear(terrain, body.x, body.y, at.x, at.y)) return true;
+            if ((near || inArc(body, at, sight.angle)) && terrainKit.sightClear(terrain, body.x, body.y, at.x, at.y)) return true;
         }
         return false;
     }

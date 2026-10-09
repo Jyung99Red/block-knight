@@ -38,6 +38,24 @@ const dayKit = (() => {
         return { from, to, mix: u * u * (3 - 2 * u) };
     }
 
+    // How much of the day it is at an hour, 0 (night) to 1 (day): the
+    // looks' own, so it goes over as the light does, at dawn and at dusk.
+    function daylight(hour) {
+        const l = look(hour), day = name => name === 'night' ? 0 : 1;
+        return day(l.from) + (day(l.to) - day(l.from)) * l.mix;
+    }
+    // What a fighter sees at an hour ({ angle, near }: player.sight, the
+    // day's and the night's with `daylight` between them), in steps too
+    // small to see, so the shade's edge is not cast anew every frame
+    // while the hour goes on.
+    function sight(hour) {
+        const S = gameConfig.player.sight, d = daylight(hour), mix = (k, step) => {
+            const lo = Math.min(S.night[k], S.day[k]), hi = Math.max(S.night[k], S.day[k]), v = S.night[k] + (S.day[k] - S.night[k]) * d;
+            return d > 0 && d < 1 ? Math.min(hi, Math.max(lo, Math.round(v / step) * step)) : v;
+        };
+        return { angle: mix('angle', 0.002), near: mix('near', 0.5) };
+    }
+
     // The light from the sky at an hour: the sun by day, the moon by night,
     // each on an arc from the east (rising) over the north to the west
     // (setting), `high` at its highest, never lower than `low` (its shadows
@@ -59,5 +77,5 @@ const dayKit = (() => {
         const fade = Math.max(0, Math.min(1, since / d.fadeHours, (length - since) / d.fadeHours));
         return { body: day ? 'sun' : 'moon', dir: [x, y, z], fade: fade * fade * (3 - 2 * fade), day };
     }
-    return { hourAt, hourOf, secondsAt, look, sky };
+    return { hourAt, hourOf, secondsAt, look, daylight, sight, sky };
 })();

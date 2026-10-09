@@ -72,8 +72,8 @@ void main() {
 
         // ---- sight: what this fighter cannot see is shaded; walls at least
         // eye high cast the shade, and so does everything outside the front
-        // arc it sees (player.sightAngle) but for a small ring round it
-        // (player.sightNear; user, 2026-10-04). The same in the adventure
+        // arc it sees (player.sight, the hour's) but for a small ring round
+        // it (user, 2026-10-04). The same in the adventure
         // and in a duel (user, 2026-10-04). The edge of sight comes exact
         // from the terrain (terrainKit.sightFan: rays past every wall
         // corner), so it slides evenly as the fighter walks; an even spread
@@ -92,12 +92,14 @@ void main() {
         const mask = fanMask(MASK, SIGHT_FAR), fan = { n: 0, angle: new Float64Array(0), reach: new Float64Array(0) };
         ground.sight.mask.value = mask.texture; ground.sight.at.value.set(0, 0, mask.half);
         ground.sight.tone.value.set(...SHADE.color.map(v => v / 255), SHADE.opacity);
-        let lastX = NaN, lastZ = NaN, lastFacing = NaN, lastRev = -1;
-        // Recast only when the fighter has moved or turned (or the terrain changed).
-        function update(x, z, facing) {
-            if (x === lastX && z === lastZ && facing === lastFacing && lastRev === t.rev) return;
-            lastX = x; lastZ = z; lastFacing = facing; lastRev = t.rev;
-            terrainKit.sightFan(t, x * U, z * U, SIGHT_FAR * U, { facing, half: C.player.sightAngle, near: C.player.sightNear, out: fan });
+        let lastX = NaN, lastZ = NaN, lastFacing = NaN, lastRev = -1, lastAngle = NaN, lastNear = NaN;
+        // Recast only when the fighter has moved or turned, what it sees
+        // (`seen`: { angle, near }, the hour's: dayKit.sight) has changed,
+        // or the terrain has.
+        function update(x, z, facing, seen) {
+            if (x === lastX && z === lastZ && facing === lastFacing && lastRev === t.rev && seen.angle === lastAngle && seen.near === lastNear) return;
+            lastX = x; lastZ = z; lastFacing = facing; lastRev = t.rev; lastAngle = seen.angle; lastNear = seen.near;
+            terrainKit.sightFan(t, x * U, z * U, SIGHT_FAR * U, { facing, half: seen.angle, near: seen.near, out: fan });
             ground.sight.at.value.set(x, z, mask.half);
             mask.draw(x, z, fan);
         }

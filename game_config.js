@@ -29,16 +29,22 @@ const gameConfig = (() => {
         // to runSpeed over runRampSeconds (set apart from the walk, user
         // 2026-10-02: changing one leaves the other), and back down the same
         // way once the walk is broken (stick eased off or released, a wall).
-        // sightAngle: the body sees only what lies within this of where it
-        // faces (75 degrees either side: the front 150), and not past
-        // blocks at least eye high; the rest of the ground is shaded, with
-        // the blocks and plants on it (user, 2026-10-05), and a monster or
-        // a rival there is not drawn (user, 2026-10-04: the same in the
-        // adventure and in a duel). sightNear: world units round the body
-        // it sees whichever way it faces, a little behind it too (user,
-        // 2026-10-06: two and a half blocks; it was two); walls hide there
-        // as well.
-        player: { speed: 122, turnRate: 8, radius: 12, runAfter: 1.5, runSpeed: 252, runRampSeconds: 0.3, runStick: 0.9, startSeconds: 0.12, turnSlow: 0.5, sightAngle: Math.PI * 5 / 12, sightNear: 100 },
+        // sight: what the body sees, by day and by night (the hour's own,
+        // between the two as the light goes over: core/daytime.js `sight`;
+        // user, 2026-10-09: it was 75 degrees and 100 all day). `angle`: it
+        // sees only what lies within this of where it faces, either side
+        // (by day 60 degrees: the front 120; by night 45: the front 90),
+        // and not past blocks at least eye high; the rest of the ground is
+        // shaded, with the blocks and plants on it (user, 2026-10-05), and
+        // a monster or a rival there is not drawn (user, 2026-10-04: the
+        // same in the adventure and in a duel). `near`: world units round
+        // the body it sees whichever way it faces, a little behind it too
+        // (by day two and a half blocks: user, 2026-10-06, it was two; by
+        // night one and a half); walls hide there as well.
+        player: {
+            speed: 122, turnRate: 8, radius: 12, runAfter: 1.5, runSpeed: 252, runRampSeconds: 0.3, runStick: 0.9, startSeconds: 0.12, turnSlow: 0.5,
+            sight: { day: { angle: Math.PI / 3, near: 100 }, night: { angle: Math.PI / 4, near: 60 } }
+        },
 
         // 3. Animation. blendSeconds: idle <-> walk cross-fade.
         animation: { blendSeconds: 0.1 },

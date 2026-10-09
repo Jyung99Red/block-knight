@@ -7,6 +7,8 @@ const { load } = require('./load.cjs');
 const { dayKit, worldSim: W, gameConfig } = load();
 const D = gameConfig.day;
 const near = (a, b, eps = 1e-9) => Math.abs(a - b) < eps;
+// (Objects made in the game's own context are not this one's.)
+const plain = value => JSON.parse(JSON.stringify(value));
 
 test('a day is day.seconds of play; a new game starts at startHour', () => {
     assert.equal(D.seconds, 1200, '20 minutes (user)');
@@ -61,4 +63,26 @@ test('the look goes evenly from one named hour to the next, round midnight too',
         for (const k of new Set([...Object.keys(w), ...Object.keys(last)])) assert.ok(Math.abs((w[k] || 0) - (last[k] || 0)) < 0.02, `${h.toFixed(2)} ${k}`);
         last = w;
     }
+});
+
+test('a fighter sees what the day gives by day and the night by night, and it goes over between with the light (user, 2026-10-09)', () => {
+    const { day, night } = gameConfig.player.sight, seen = h => dayKit.sight(h);
+    const same = (got, want, text) => assert.ok(near(got.angle, want.angle, 0.002) && near(got.near, want.near, 0.5), `${text}: ${JSON.stringify(got)}`);
+    assert.deepEqual(plain(seen(12)), plain(day), 'exactly the day values at noon'); assert.deepEqual(plain(seen(0)), plain(night), 'and the night values at midnight');
+    same(seen(12), day, 'noon'); same(seen(8.5), day, 'morning'); same(seen(17), day, 'afternoon');
+    same(seen(23), night, 'night'); same(seen(3), night, 'small hours');
+    assert.equal(dayKit.daylight(12), 1); assert.equal(dayKit.daylight(0), 0);
+    // Dawn and dusk go over smoothly, one way and the other, and never past the two.
+    for (const [from, to] of [[6, 8], [18.25, 20]]) {
+        let last = seen(from);
+        for (let k = 1; k <= 200; k++) {
+            const now = seen(from + (to - from) * k / 200), up = to > from && from < 12;
+            const sign = up ? 1 : -1;
+            assert.ok(sign * (now.angle - last.angle) >= -1e-9 && sign * (now.near - last.near) >= -1e-9, 'one way');
+            assert.ok(now.angle >= night.angle - 1e-9 && now.angle <= day.angle + 1e-9 && now.near >= night.near - 1e-9 && now.near <= day.near + 1e-9, 'between the two');
+            last = now;
+        }
+    }
+    // In steps too small to see (the shade's edge is not cast anew every frame).
+    assert.equal(seen(6.5).angle, seen(6.5001).angle);
 });

@@ -376,7 +376,8 @@ const worldView = (() => {
             // monster or the dummy behind its back or behind a wall. The
             // title screen's camera is not the fighter's: everything is
             // drawn, and the bodies near what it looks at.
-            const inSight = view ? () => true : body => combatKit.sees(current.terrain, me, body);
+            const seeing = dayKit.sight(dayKit.hourOf(current, tune.hourShift));
+            const inSight = view ? () => true : body => combatKit.sees(current.terrain, me, body, seeing);
             seen.clear();
             const drawn = [];
             for (const f of current.fighters) {
@@ -431,7 +432,7 @@ const worldView = (() => {
             ground.update();
             effects.onEvents(events, selfId);
             effects.update(frameSeconds, current, { selfId, fighters: drawn, foes });
-            sight.update(at[0], at[2], me.facing);
+            sight.update(at[0], at[2], me.facing, seeing);
             sight.show(!view);
             if (view) {
                 camera.position.fromArray(view.eye);

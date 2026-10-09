@@ -67,7 +67,7 @@ const viewLight = (() => {
             for (const k of ['sky', 'sun', 'torch', 'shadow']) now[k] = mix(a[k], b[k]);
             for (const k of ['fog', 'fade']) { now[k][0] = mix(a[k][0], b[k][0]); now[k][1] = mix(a[k][1], b[k][1]); }
             now.colors.forEach((c, i) => c.set(P[a.colors[i]]).lerp(other.set(P[b.colors[i]]), u));
-            now.outside = mix(l.from === 'night' ? 0 : 1, l.to === 'night' ? 0 : 1);
+            now.outside = dayKit.daylight(hour);
         }
         blend(dayKit.hourOf(sim, tune.hourShift));
         const sky = now.colors[3].clone();
