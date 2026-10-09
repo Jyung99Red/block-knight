@@ -12,7 +12,7 @@
 //   key pressed at the latest moment that still chains at full speed; or
 //   one of the other poses (guard, drink, ...). Each answers stateAt(time)
 //   with the body as the game would pose it.
-// - Checks: a swing measured the way tests/hits.test.cjs measures it.
+// - Checks: a swing measured the way tests/hits.test.cjs judges hits.
 // - Export: what changed, as source text to paste back into the files.
 const moveLab = (() => {
     const K = () => gameConfig.combo, MOVES = () => gameConfig.combo.moves;
@@ -494,7 +494,7 @@ const moveLab = (() => {
     }
     const loadoutTypeOf = loadout => inventoryKit.weaponOf(loadout);
 
-    // ---- checks, as tests/hits.test.cjs makes them ----
+    // ---- checks: hits judged as tests/hits.test.cjs judges them ----
     // The attacker at the origin, from the stance, its step left out; the
     // blade tip over the swing (41 samples): angle (radians, + is the
     // attacker's left, unwrapped), height and how far ahead (blocks).

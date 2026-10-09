@@ -609,9 +609,8 @@ const tuneApp = (() => {
             if (full) lastFull = { id, ...lab.measure(id, { offhand: state.offhand || null }) };
             const f = lastFull?.id === id ? lastFull : null;
             const yes = (ok, good = true) => ok == null ? '<span class="wait">…</span>' : ok === good ? '<span class="ok">✓</span>' : '<span class="bad">✗</span>';
-            const sweepOff = Math.abs(m.sweep - was.sweep);
             checksBox.innerHTML = `
-                <dt>扫过的角度</dt><dd><b class="${sweepOff > 15 ? 'warn' : ''}">${Math.round(m.sweep)}°</b>（文件里 ${Math.round(was.sweep)}°；测试允许和设计值差 15° 以内）</dd>
+                <dt>扫过的角度</dt><dd><b>${Math.round(m.sweep)}°</b>（文件里 ${Math.round(was.sweep)}°）</dd>
                 <dt>剑尖起点</dt><dd>${side(m.start.angle, m.start.height)}${m.start.ahead < 0 ? ' · 在身后' : ''}</dd>
                 <dt>剑尖终点</dt><dd>${side(m.end.angle, m.end.height)}${m.end.ahead < 0 ? ' · 在身后' : ''}</dd>
                 <dt>剑尖最低</dt><dd><b class="${m.lowest < 0 ? 'warn' : ''}">${fixed(m.lowest)} 格</b>（低于 0 就插进地里，别太明显）</dd>

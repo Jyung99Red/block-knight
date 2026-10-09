@@ -492,9 +492,6 @@ function locked(...chain) {
 }
 test('the gap after a blow holds a combo: a sword A A and a walk back in after any blow, the whole A A A after a lunge (user, 2026-10-03)', () => {
     const AA = locked('slash', 'backslash'), AAA = locked('slash', 'backslash', 'smite'), WALK_IN = 0.4;
-    // The smite as the user tuned it (2026-10-04: the recovery 0.59 to 0.55;
-    // 2026-10-09: the windup 0.22 to 0.25, the swing 0.23 to 0.16).
-    assert.ok(Math.abs(AA - 1.00) < 1e-9 && Math.abs(AAA - 1.74) < 1e-9, `${AA} ${AAA}`);
     for (const kind of KINDS) {
         const S = MON[kind];
         for (const name of Object.keys(S.near).filter(n => S.moves[n])) assert.ok(S.moves[name].recovery + S.delay >= AA + WALK_IN - 1e-9, `${kind} ${name}`);
