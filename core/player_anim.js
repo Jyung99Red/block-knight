@@ -186,17 +186,16 @@ const playerAnim = (() => {
         const f = key[l.names[2]], k = rig.scale;
         return f ? { x: l.hip[0] + (f.px || 0) * k, z: (f.pz || 0) * k, y: (f.py || 0) * k, rx: f.rx || 0, ry: f.ry || 0, arc: 0 } : held[i];
     });
-    // From feet `from` to `to` over s (0..1), each lifted on an arc as high
-    // as its step is long allows. Standing, one foot at a time (the one going
-    // forward first, each taking the time its step is long, easing in and
-    // out). `ahead`: how far the body itself goes meanwhile (s eased as it
-    // goes), the feet going with it together; one that stays in the world
-    // goes as far back in the body's frame, unlifted.
+    // From feet `from` to `to` over s (0..1), one foot at a time (the one
+    // going forward first, each taking the time its step is long, easing in
+    // and out), each lifted on an arc as high as its step is long allows.
+    // `ahead`: how far the body itself goes meanwhile (s eased as it goes);
+    // a foot on the ground goes as far back in the body's frame.
     function stepTo(from, to, s, ahead = 0) {
         const F = playerPoses.feet, far = from.map((f, i) => Math.hypot(to[i].x - f.x, to[i].z + ahead - f.z));
-        const first = to[0].z - from[0].z >= to[1].z - from[1].z ? 0 : 1, split = ahead ? 1 : far[first] / (far[0] + far[1] || 1);
+        const first = to[0].z - from[0].z >= to[1].z - from[1].z ? 0 : 1, split = far[first] / (far[0] + far[1] || 1);
         return from.map((f, i) => {
-            const t = to[i], k = ahead ? s : smooth(clamp01(i === first ? s / (split || 1) : (s - split) / (1 - split || 1)));
+            const t = to[i], k = smooth(clamp01(i === first ? s / (split || 1) : (s - split) / (1 - split || 1)));
             // A foot still in the air from the step before comes down meanwhile.
             const go = (a, b) => a + (b - a) * k, was = f.arc || 0;
             const arc = was * (1 - smooth(clamp01(2 * s))) + Math.min(F.lift, F.liftPerBlock * far[i]) * Math.sin(Math.PI * k);

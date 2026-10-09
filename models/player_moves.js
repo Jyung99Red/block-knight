@@ -6,8 +6,8 @@
 // in them: footR / footL say where each foot stands (a foot left out stays
 // where it is) and pelvis py how high the hips are; core/player_anim.js
 // bends the legs to that. The sword's A A A, `rising` and `cleave` cut on the
-// diagonal, the charged cut sweeps low (design.md 4.2); no blade touches
-// the ground. rx < 0 raises an arm forward; ry > 0 turns towards the
+// diagonal, the charged cut sweeps low (design.md 4.2); a blade may touch
+// the ground, but not go into it to be seen (design.md 2.4). rx < 0 raises an arm forward; ry > 0 turns towards the
 // character's left (+x); rz < 0 lifts the right arm out to the side.
 const playerMoves = (() => {
     // The shield arm, carried in front, unless a key says otherwise.
@@ -21,25 +21,21 @@ const playerMoves = (() => {
         // as are the backslash's, the smite's `b`, the thrust's `b`, the
         // rising cut's `a` and the follow's keys below.
         slash: {
-            a: key({ base: { rx: 0.1 }, pelvis: { py: 0.01 }, chest: { ry: -0.3, rx: -0.05 }, upperArmR: { rx: -1.88, ry: -0.63, rz: -0.41 }, handR: { rx: 0.84, ry: -1.2, rz: 2.27 }, footR: { pz: 0.27, rx: -0.45 }, footL: { pz: -0.24, rx: 0.45 } }),
+            a: key({ base: { rx: 0.1 }, pelvis: { py: 0.01 }, chest: { ry: -0.3, rx: -0.05 }, upperArmR: { rx: -1.88, ry: -0.63, rz: -0.41 }, handR: { rx: 0.84, ry: -1.2, rz: 2.27 }, footR: { pz: 0.15 }, footL: { pz: -0.13 } }),
             b: key({ chest: { ry: 0.33, rx: 0.25 }, upperArmR: { rx: -0.85, ry: 0.6 }, forearmR: { rz: 0.25 }, handR: { rx: 1.2 } })
         },
         // Back up the same diagonal: low left to the right, at the shoulder.
         backslash: {
             a: key({ pelvis: { py: 0.01 }, chest: { ry: 0.3, rx: 0.12 }, upperArmR: { rx: -0.85, ry: 0.6, rz: 0.1 }, forearmR: { rz: 0.3 }, handR: { rx: 1.2 } }),
-            b: key({ chest: { ry: -0.3, rx: -0.05 }, upperArmR: { rx: -1.5, rz: -0.3, ry: -0.65 }, handR: { rx: 1.3 } })
+            b: key({ chest: { ry: -0.3, rx: -0.05 }, upperArmR: { rx: -1.5, rz: -0.3, ry: -0.65 }, handR: { rx: 1.3 }, footR: { pz: -0.24, rx: 0.2, py: -0.06 }, footL: { pz: 0.01 } })
         },
-        // The finisher, with weight: the upper arm level, out front to the right,
-        // the forearm up and the blade leaning well back to the right from
-        // the wrist (the user's own numbers); then down hard to the low left
-        // (user, 2026-10-03). It takes no step, so its keys leave the feet
-        // out: they stay where the backslash left them (user, 2026-10-09);
-        // the hips turn away and then into the cut and sink, the knees
-        // bending. The chest is turned back by as much as the hips, so the
-        // arms and the blade are where the user put them.
+        // The finisher, with weight: the blade raised back over the right
+        // shoulder, then down hard in front, like the cleave, the right foot
+        // stepping in; the hips turn away and then into the cut and sink
+        // (the user's own numbers from the move tuner, 2026-10-09).
         smite: {
-            a: key({ pelvis: { ry: -0.2 }, chest: { ry: -0.2, rx: -0.1 }, upperArmR: { rx: -1.5, ry: -0.85 }, forearmR: { rx: -1.5 }, handR: { rx: 2.6, ry: 1.3 } }),
-            b: key({ pelvis: { py: -0.06, ry: 0.25 }, chest: { ry: 0.05, rx: 0.3 }, upperArmR: { rx: -0.85, ry: 0.65 }, handR: { rx: 0.772, rz: 0.2, ry: 0.467 } })
+            a: key({ pelvis: { ry: -0.2 }, chest: { ry: -0.2, rx: -0.2 }, upperArmR: { rx: -2.73, ry: -0.87, rz: -0.212 }, forearmR: { rx: -0.49, ry: 0.1, rz: -0.05 }, handR: { rx: 1.68, ry: 0.47 }, footR: { pz: -0.2, rx: 0.45 } }),
+            b: key({ pelvis: { py: -0.06, ry: 0.25 }, chest: { ry: 0.05, rx: 0.4 }, upperArmR: { rx: -1.0 }, handR: { rz: -1.66, rx: 1.5 }, footR: { pz: 0.22 } })
         },
         // Straight ahead.
         thrust: {

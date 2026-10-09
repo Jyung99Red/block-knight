@@ -607,14 +607,14 @@ const tuneApp = (() => {
             if (state.mode === 'pose') return;
             const id = state.move, m = lab.measure(id, { offhand: state.offhand || null, quick: true }), was = baselineOf(id);
             if (full) lastFull = { id, ...lab.measure(id, { offhand: state.offhand || null }) };
-            const f = lastFull?.id === id ? lastFull : null, sword = moves()[id].weapon === 'sword';
+            const f = lastFull?.id === id ? lastFull : null;
             const yes = (ok, good = true) => ok == null ? '<span class="wait">…</span>' : ok === good ? '<span class="ok">✓</span>' : '<span class="bad">✗</span>';
             const sweepOff = Math.abs(m.sweep - was.sweep);
             checksBox.innerHTML = `
                 <dt>扫过的角度</dt><dd><b class="${sweepOff > 15 ? 'warn' : ''}">${Math.round(m.sweep)}°</b>（文件里 ${Math.round(was.sweep)}°；测试允许和设计值差 15° 以内）</dd>
                 <dt>剑尖起点</dt><dd>${side(m.start.angle, m.start.height)}${m.start.ahead < 0 ? ' · 在身后' : ''}</dd>
                 <dt>剑尖终点</dt><dd>${side(m.end.angle, m.end.height)}${m.end.ahead < 0 ? ' · 在身后' : ''}</dd>
-                <dt>剑尖最低</dt><dd><b class="${m.lowest < 0 ? 'bad' : sword && m.lowest < 0.3 ? 'warn' : ''}">${fixed(m.lowest)} 格</b>${sword ? '（剑不碰地：至少 0.3 格）' : ''}</dd>
+                <dt>剑尖最低</dt><dd><b class="${m.lowest < 0 ? 'warn' : ''}">${fixed(m.lowest)} 格</b>（低于 0 就插进地里，别太明显）</dd>
                 <dt>标准距离 ${f?.standard ?? lab.standardOf(moves()[id].weapon)}</dt><dd>打到木桩 ${yes(f?.landsDummy)} 打到人 ${yes(f?.landsPlayer)}</dd>
                 <dt>${lab.TOO_FAR} 以外</dt><dd>打不到 ${yes(f?.tooFar, false)}</dd>
                 <dt>最远打到</dt><dd>${f ? f.reach != null ? `${f.reach}（${fixed(f.reach / U)} 格）` : '—' : '<span class="wait">…</span>'}</dd>`;

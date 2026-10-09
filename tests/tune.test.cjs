@@ -196,8 +196,6 @@ test('its checks are the hit tests\': every move lands on the dummy and on a per
         assert.ok(m.reach >= m.standard && m.reach < L.TOO_FAR, `${id} reaches ${m.reach}`);
         assert.ok(m.sweep > 0 && m.path.length === 41);
     }
-    // The sword's cuts stay off the ground (tests/hits.test.cjs).
-    for (const id of ['slash', 'backslash', 'smite', 'charged']) assert.ok(L.measure(id, { quick: true }).lowest > 0.3, id);
 });
 
 test('combos: every move of a weapon is on some route; the real tree plays them, chained at the derive point', () => {

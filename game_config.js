@@ -153,8 +153,8 @@ const gameConfig = (() => {
             },
             moves: {
                 slash: { weapon: 'sword', name: '斜斩', windup: 0.13, swing: 0.10, recovery: 0.32, derive: 0.15, ratio: 0.36, stagger: 0, knockback: 0, step: 3, next: { a: 'backslash', b: 'rising' } },
-                backslash: { weapon: 'sword', name: '回扫', windup: 0.13, swing: 0.10, recovery: 0.39, derive: 0.17, ratio: 0.38, stagger: 0, knockback: 0, step: 3, next: { a: 'smite', b: 'cleave', pause: 'thrust' } },
-                smite: { weapon: 'sword', name: '重斩', windup: 0.22, swing: 0.23, recovery: 0.55, ratio: 0.52, stagger: 0, knockback: 0, step: 0 },
+                backslash: { weapon: 'sword', name: '回扫', windup: 0.13, swing: 0.10, recovery: 0.39, derive: 0.17, ratio: 0.38, stagger: 0, knockback: 0, step: 4, next: { a: 'smite', b: 'cleave', pause: 'thrust' } },
+                smite: { weapon: 'sword', name: '重斩', windup: 0.25, swing: 0.16, recovery: 0.55, ratio: 0.52, stagger: 0, knockback: 0, step: 8 },
                 thrust: { weapon: 'sword', name: '连刺', windup: 0.30, swing: 0.08, recovery: 0.56, ratio: 0.61, stagger: 0, knockback: 0, step: 15 },
                 rising: { weapon: 'sword', name: '上挑', windup: 0.38, swing: 0.12, recovery: 0.57, ratio: 0.74, stagger: 2, knockback: 16, step: 3 },
                 cleave: { weapon: 'sword', name: '下劈', windup: 0.38, swing: 0.10, recovery: 0.59, ratio: 0.80, stagger: 2, knockback: 16, step: 5 },

@@ -77,9 +77,10 @@ test('the sword\'s cuts keep their sweeps; the A A A on the diagonal, the charge
     // Blade tip sweep, degrees. Slash, backslash, smite and follow as the
     // user set their keys in the move tuner (2026-10-04): the slash from
     // further back on the right, the backslash ending at the shoulder, not
-    // over the head; the smite ending further round to the left; the
-    // follow starting with the wrist turned, the blade out to the left.
-    const designed = { slash: 168, backslash: 143, smite: 185, follow: 127, charged: 222, thrust: 25 };
+    // over the head; the follow starting with the wrist turned, the blade
+    // out to the left. The smite comes down in front, like the cleave (the
+    // user's keys, 2026-10-09).
+    const designed = { slash: 168, backslash: 143, smite: 147, follow: 127, charged: 222, thrust: 25 };
     for (const [move, arc] of Object.entries(designed)) {
         const a = tipAngles(move).map(x => x.angle), sweep = degrees(Math.max(...a) - Math.min(...a));
         assert.ok(Math.abs(sweep - arc) <= 15, `${move} sweeps ${sweep.toFixed(0)} degrees, designed ${arc}`);
@@ -87,25 +88,23 @@ test('the sword\'s cuts keep their sweeps; the A A A on the diagonal, the charge
     // Slash, smite and charged go right to left; backslash and follow left to right.
     for (const move of ['slash', 'smite', 'charged']) { const a = tipAngles(move); assert.ok(a.at(-1).angle > a[0].angle, `${move} goes right to left`); }
     for (const move of ['backslash', 'follow']) { const a = tipAngles(move); assert.ok(a.at(-1).angle < a[0].angle, `${move} goes left to right`); }
-    // The A A A: high right down to low left, back up to the right at shoulder height, then down again from the blade raised back over the shoulder.
+    // The A A A: high right down to low left, back up to the right at shoulder height, then down in front from the blade raised back over the shoulder.
     const slash = tipAngles('slash'), back = tipAngles('backslash'), smite = tipAngles('smite'), charged = tipAngles('charged');
     assert.ok(slash[0].angle < 0 && slash[0].height > 1.8 && slash.at(-1).angle > 0 && slash.at(-1).height < 0.8, 'slash: high right to low left');
     assert.ok(back[0].angle > 0 && back[0].height < 0.8 && back.at(-1).angle < 0 && back.at(-1).height > 1.4, 'backslash: low left back up to the right');
-    assert.ok(smite[0].height > 1.8 && smite[0].ahead < 0 && smite[0].angle < 0 && smite.at(-1).angle > 0 && smite.at(-1).height < 0.8, 'smite: from the blade raised back over the right shoulder to low left');
+    assert.ok(smite[0].height > 1.8 && smite[0].ahead < 0 && smite[0].angle < 0 && Math.abs(smite.at(-1).angle) < 0.3 && smite.at(-1).height < 0.8, 'smite: from the blade raised back over the right shoulder down to low in front');
     // The charged cut starts with the blade laid back and crosses the front low, like a scythe.
     assert.ok(charged[0].ahead < -1 && Math.abs(charged[0].angle) > 2, 'charged: the blade starts behind');
     const across = charged.filter(x => Math.abs(x.angle) < 0.3 && x.ahead > 0);
     assert.ok(across.length && across.every(x => x.height < 0.9), 'and sweeps across the front below the waist');
-    // None of them strikes the ground.
-    for (const [move, tips] of Object.entries({ slash, back, smite, charged })) assert.ok(tips.every(x => x.height > 0.3), `${move} stays off the ground`);
 });
 
-test('the smite covers the front and, coming from behind the shoulder, the right; the charged cut from the left round to the right side', () => {
+test('the smite, coming down from behind the shoulder, covers the front and the right (user, 2026-10-09); the charged cut from the left round to the right side', () => {
     const covered = move => { const out = []; for (let deg = -180; deg < 180; deg += 10) if (lands(move, target('post', STANDARD, deg * Math.PI / 180))) out.push(deg); return out; };
     const smite = covered('smite'), charged = covered('charged');
     // Posts at the standard distance, + on the right (simulation y).
-    for (let deg = -40; deg <= 40; deg += 10) assert.ok(smite.includes(deg), `smite misses a post at ${deg}`);
-    assert.ok(smite.includes(90) && !smite.some(d => d <= -70), `smite: the right side, not the far left: ${smite}`);
+    for (let deg = -10; deg <= 40; deg += 10) assert.ok(smite.includes(deg), `smite misses a post at ${deg}`);
+    assert.ok(smite.includes(70) && !smite.some(d => d <= -40), `smite: the right side, not the left: ${smite}`);
     for (let deg = -60; deg <= 90; deg += 10) assert.ok(charged.includes(deg), `charged misses a post at ${deg}`);
 });
 
