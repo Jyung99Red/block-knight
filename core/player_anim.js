@@ -203,14 +203,22 @@ const playerAnim = (() => {
             return { x: go(f.x, t.x), z: go(f.z, t.z + ahead) - ahead * s, y: go(f.y - was, t.y) + arc, rx: go(f.rx, t.rx), ry: go(f.ry, t.ry), arc };
         });
     }
-    // A move's recovery, from where its swing left the feet (`swung`; for
-    // a move cut short, its key `b`) back to the rest: they keep the cut's
-    // stance up to the derive point (the next move of a combo takes them as
-    // they are), then step back. A move that keeps its feet is a finisher:
-    // none goes on from it.
+    // Where a move's swing leaves the feet, from where it found them: where
+    // its keys put them, a foot they leave out where it was (through the
+    // swing's step `ahead`, on the ground where it stood, so the body
+    // leaves it that much further behind).
+    function swungTo(rig, id, found, ahead) {
+        const K = playerMoves.moves[id];
+        return placed(rig, K.b, placed(rig, K.a, found).map(f => ({ ...f, z: f.z - ahead })));
+    }
+    const aheadOf = (rig, step) => step / gameConfig.world.unitsPerBlock * rig.scale;
+    // A move's recovery, from where its swing left the feet back to the
+    // rest: they keep the cut's stance up to the derive point (the next move
+    // of a combo takes them as they are), then step back. For a move cut
+    // short, where its swing left them is worked out from the rest.
     function recoverFeet(rig, id, t, rest, swung, raised) {
         const m = gameConfig.combo.moves[id], start = m.derive || 0, home = standOf(rig, rest).feet;
-        return stepTo(swung || placed(rig, playerMoves.moves[id].b, home), home, clamp01((t - start) / Math.max(1e-9, m.recovery - start)), 0, raised);
+        return stepTo(swung || swungTo(rig, id, home, aheadOf(rig, m.step)), home, clamp01((t - start) / Math.max(1e-9, m.recovery - start)), 0, raised);
     }
     // The feet at a moment of the move `act`, in the body's frame as it is
     // then (the swing's step taken so far is behind it).
@@ -226,10 +234,10 @@ const playerAnim = (() => {
         if (act.phase === 'charge') return a;
         // The swing: the feet go as the body goes its `step` forward
         // (core/fighter.js), easing out.
-        const b = placed(rig, K.b, a);
+        const ahead = aheadOf(rig, act.stepTotal ?? m.step), b = placed(rig, K.b, a.map(f => ({ ...f, z: f.z - ahead })));
         if (act.phase === 'swing') {
             const u = clamp01(act.t / m.swing);
-            return stepTo(a, b, 1 - (1 - u) * (1 - u), (act.stepTotal ?? m.step) / gameConfig.world.unitsPerBlock * rig.scale);
+            return stepTo(a, b, 1 - (1 - u) * (1 - u), ahead);
         }
         return recoverFeet(rig, act.move, act.t, rest, b);
     }
