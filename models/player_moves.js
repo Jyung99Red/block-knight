@@ -21,13 +21,13 @@ const playerMoves = (() => {
         // as are the backslash's, the smite's `b`, the thrust's `b`, the
         // rising cut's `a` and the follow's keys below.
         slash: {
-            a: key({ base: { rx: 0.1 }, pelvis: { py: 0.01 }, chest: { ry: -0.3, rx: -0.05 }, upperArmR: { rx: -1.88, ry: -0.63, rz: -0.41 }, handR: { rx: 0.84, ry: -1.2, rz: 2.27 }, footR: { pz: 0.15 }, footL: { pz: -0.13 } }),
+            a: key({ base: { rx: 0.1 }, pelvis: { py: 0.01 }, chest: { ry: -0.3, rx: -0.05 }, upperArmR: { rx: -1.88, ry: -0.63, rz: -0.41 }, handR: { rx: 0.84, ry: -1.2, rz: 2.27 }, footR: { pz: -0.13 }, footL: { pz: 0.15 } }),
             b: key({ chest: { ry: 0.33, rx: 0.25 }, upperArmR: { rx: -0.85, ry: 0.6 }, forearmR: { rz: 0.25 }, handR: { rx: 1.2 } })
         },
         // Back up the same diagonal: low left to the right, at the shoulder.
         backslash: {
             a: key({ pelvis: { py: 0.01 }, chest: { ry: 0.3, rx: 0.12 }, upperArmR: { rx: -0.85, ry: 0.6, rz: 0.1 }, forearmR: { rz: 0.3 }, handR: { rx: 1.2 } }),
-            b: key({ chest: { ry: -0.3, rx: -0.05 }, upperArmR: { rx: -1.5, rz: -0.3, ry: -0.65 }, handR: { rx: 1.3 }, footR: { pz: -0.24, rx: 0.2, py: -0.06 }, footL: { pz: 0.01 } })
+            b: key({ chest: { ry: -0.3, rx: -0.05 }, upperArmR: { rx: -1.5, rz: -0.3, ry: -0.65 }, handR: { rx: 1.3 }, footR: { rx: 0.16, pz: -0.2 } })
         },
         // The finisher, with weight: the blade raised back over the right
         // shoulder, then down hard in front, like the cleave, the right foot
