@@ -81,9 +81,9 @@ test('a blocked hit does a share of the damage and no stun; from behind the shie
     assert.ok(behind.player.stun > 0);
 });
 
-test('the guard covers the front 120 degrees, 60 either side of where the body faces (user, 2026-10-04; it was 180)', () => {
-    assert.ok(Math.abs(GU.frontAngle - Math.PI / 3) < 1e-12);
-    for (const [deg, blocks] of [[0, 1], [55, 1], [-55, 1], [65, 0], [-65, 0], [90, 0]]) {
+test('the guard covers an arc in front of the body: a blow from inside it is blocked, from outside it hurts', () => {
+    const edge = GU.frontAngle * 180 / Math.PI;
+    for (const [deg, blocks] of [[0, 1], [edge - 5, 1], [5 - edge, 1], [edge + 5, 0], [-edge - 5, 0], [180, 0]]) {
         const sim = guardAt(setup({ turned: deg * Math.PI / 180 }), impactTime - 0.8);
         assert.deepEqual([sim.stats.blocks, sim.stats.hurt], [blocks, 1 - blocks], `the blow comes from ${deg} degrees off the front`);
     }

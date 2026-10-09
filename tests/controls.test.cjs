@@ -32,7 +32,6 @@ test('screen directions map to the ground wherever the camera has been turned to
     assert.deepEqual(g(1, 0, 0), [1, 0]);
     // A camera turned a quarter round still maps screen-up to "away from the camera".
     assert.deepEqual(g(0, -1, Math.PI / 2), [-1, 0]);
-    assert.equal(gameConfig.camera.yaw, 0, 'the camera stands due south at first');
 });
 
 test('a drag across the picture turns the camera: to the right looks to the right, and all the way round', () => {

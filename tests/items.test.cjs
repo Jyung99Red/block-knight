@@ -18,11 +18,12 @@ const fresh = () => saveKit.fresh();
 const put = (body, x, y, facing) => { body.x = x; body.y = y; if (facing !== undefined) body.facing = facing; };
 
 // ---- stats and gear ----
-test('stats are the base plus the gear worn; the starter gear makes 360 HP, 30 ATK, 8 DEF', () => {
-    assert.deepEqual(plain(K.statsOf(K.starter())), { maxHp: 360, atk: 30, def: 8 });
-    assert.deepEqual(plain(K.statsOf({ main: 'iron_sword', offhand: 'iron_shield', armor: 'iron_armor', accessory: 'chief_charm' })),
-        { maxHp: 340 + 40 + 50, atk: 22 + 16, def: 4 + 6 + 7 });
-    assert.deepEqual(plain(K.statsOf({ main: 'wooden_sword', offhand: null, armor: null, accessory: null })), { maxHp: 340, atk: 30, def: 4 });
+test('stats are the base plus the gear worn', () => {
+    const base = gameConfig.combat.fighters.base;
+    const sum = loadout => Object.fromEntries(Object.keys(base).map(k => [k, base[k] + Object.values(loadout).reduce((n, id) => n + (I[id]?.stats?.[k] || 0), 0)]));
+    for (const loadout of [K.starter(), { main: 'iron_sword', offhand: 'iron_shield', armor: 'iron_armor', accessory: 'chief_charm' }, { main: 'wooden_sword', offhand: null, armor: null, accessory: null }]) {
+        assert.deepEqual(plain(K.statsOf(loadout)), sum(loadout));
+    }
     // Every piece of gear has a slot, stats or an offhand use, and a model.
     for (const [id, item] of Object.entries(I)) {
         if (item.kind !== 'gear' && item.kind !== 'supply') continue;
@@ -35,13 +36,14 @@ test('stats are the base plus the gear worn; the starter gear makes 360 HP, 30 A
     const save = fresh();
     save.inventory.items.iron_armor = 1; save.loadout.armor = 'iron_armor';
     const sim = W.create({ region: 'base', progress: save });
-    assert.deepEqual([sim.player.maxHp, sim.player.hp, sim.player.def], [380, 380, 13]);
+    const worn = K.statsOf(save.loadout);
+    assert.deepEqual([sim.player.maxHp, sim.player.hp, sim.player.def], [worn.maxHp, worn.maxHp, worn.def]);
     const plates = sim.rigs.fighters.player.parts.filter(p => p.owner === 'iron_armor');
     assert.ok(plates.length >= 3 && plates.every(p => p.kind === 'deco'), 'iron armor plates are drawn only: the body under them is what is hit');
     assert.deepEqual(plain(equipmentModels.lookOf(save.loadout)), { tunic: 'ironTunic', tunicTrim: 'steelDark' });
     // A duel ignores the save: both in the starter gear.
     const duel = W.create({ map: gameConfig.maps.arena, duel: true, progress: save });
-    assert.ok(duel.fighters.every(f => f.def === 8 && f.loadout.armor === 'cloth_armor'));
+    assert.ok(duel.fighters.every(f => f.def === K.statsOf(K.starter()).def && f.loadout.armor === K.starter().armor));
 });
 
 test('gear goes on only if owned and in its own slot; the main hand is never empty; potions may sit there with none left', () => {
@@ -60,16 +62,16 @@ test('gear goes on only if owned and in its own slot; the main hand is never emp
     assert.deepEqual(plain(K.gearFor('offhand')), ['potion', 'torch', 'wooden_shield', 'iron_shield']);
 });
 
-test('the shop sells potions (five at most), a torch and the ring of stealth, and buys materials, one or all', () => {
+test('the shop sells potions (a few at most), a torch and the ring of stealth, and buys materials, one or all', () => {
     const p = fresh();
     assert.equal(K.buy(p, 'potion'), '金币不够');
-    p.inventory.gold = 200;
-    for (let i = 0; i < 5; i++) assert.equal(K.buy(p, 'potion'), '');
-    assert.equal(K.buy(p, 'potion'), '最多带 5 个');
+    p.inventory.gold = 1000;
+    for (let i = 0; i < I.potion.max; i++) assert.equal(K.buy(p, 'potion'), '');
+    assert.equal(K.buy(p, 'potion'), `最多带 ${I.potion.max} 个`);
     assert.equal(K.buy(p, 'torch'), '');
     assert.equal(K.buy(p, 'torch'), '已经有了');
     assert.equal(K.buy(p, 'iron_sword'), '不卖这个');
-    assert.equal(p.inventory.gold, 200 - 5 * I.potion.price - I.torch.price);
+    assert.equal(p.inventory.gold, 1000 - I.potion.max * I.potion.price - I.torch.price);
     p.inventory.items.goblin_ear = 3; p.inventory.items.wolf_pelt = 2;
     assert.equal(K.sell(p, 'goblin_ear'), '');
     assert.equal(K.count(p, 'goblin_ear'), 2);
@@ -78,9 +80,10 @@ test('the shop sells potions (five at most), a torch and the ring of stealth, an
     assert.equal('wolf_pelt' in p.inventory.items, false, 'none left: the entry goes');
     assert.equal(K.sell(p, 'wolf_pelt'), '没有可卖的');
     assert.equal(K.sell(p, 'wooden_sword'), '不收这个');
-    assert.equal(p.inventory.gold, 200 - 5 * I.potion.price - I.torch.price + I.goblin_ear.sell + 2 * I.wolf_pelt.sell);
+    assert.equal(p.inventory.gold, 1000 - I.potion.max * I.potion.price - I.torch.price + I.goblin_ear.sell + 2 * I.wolf_pelt.sell);
     assert.deepEqual(plain(K.forSale()), ['potion', 'torch', 'stealth_ring']);
     // The ring (user, 2026-10-06): bought for gold, once, and worn as an accessory.
+    p.inventory.gold = I.stealth_ring.price - 1;
     assert.equal(K.buy(p, 'stealth_ring'), '金币不够');
     p.inventory.gold = I.stealth_ring.price;
     assert.equal(K.buy(p, 'stealth_ring'), '');

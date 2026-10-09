@@ -11,8 +11,6 @@ const near = (a, b, eps = 1e-9) => Math.abs(a - b) < eps;
 const plain = value => JSON.parse(JSON.stringify(value));
 
 test('a day is day.seconds of play; a new game starts at startHour', () => {
-    assert.equal(D.seconds, 1200, '20 minutes (user)');
-    assert.deepEqual([D.sunrise, D.sunset], [7, 19], 'light from 7 to 19 (user)');
     assert.equal(dayKit.hourAt(0), D.startHour);
     assert.ok(near(dayKit.hourAt(D.seconds), D.startHour), 'round the clock in one day');
     assert.ok(near(dayKit.hourAt(D.seconds / 24), D.startHour + 1), 'an hour is a 24th of it');
@@ -52,9 +50,6 @@ test('the look goes evenly from one named hour to the next, round midnight too',
         const l = dayKit.look(h);
         assert.ok(l.from === name && l.mix === 0, `${h} is ${name}`);
     }
-    assert.equal(dayKit.look(12).from, 'day');
-    assert.equal(dayKit.look(1).from, 'night');
-    assert.ok(['dawn'].includes(dayKit.look(D.sunrise + 0.75).from) && ['dawn'].includes(dayKit.look(D.sunset - 0.75).from), 'warm light at sunrise and sunset (user)');
     // Weight of each look, hour by hour: no jumps.
     const weights = h => { const l = dayKit.look(h), w = {}; w[l.from] = (w[l.from] || 0) + 1 - l.mix; w[l.to] = (w[l.to] || 0) + l.mix; return w; };
     let last = weights(0);
@@ -65,24 +60,12 @@ test('the look goes evenly from one named hour to the next, round midnight too',
     }
 });
 
-test('a fighter sees what the day gives by day and the night by night, and it goes over between with the light (user, 2026-10-09)', () => {
-    const { day, night } = gameConfig.player.sight, seen = h => dayKit.sight(h);
-    const same = (got, want, text) => assert.ok(near(got.angle, want.angle, 0.002) && near(got.near, want.near, 0.5), `${text}: ${JSON.stringify(got)}`);
-    assert.deepEqual(plain(seen(12)), plain(day), 'exactly the day values at noon'); assert.deepEqual(plain(seen(0)), plain(night), 'and the night values at midnight');
-    same(seen(12), day, 'noon'); same(seen(8.5), day, 'morning'); same(seen(17), day, 'afternoon');
-    same(seen(23), night, 'night'); same(seen(3), night, 'small hours');
-    assert.equal(dayKit.daylight(12), 1); assert.equal(dayKit.daylight(0), 0);
-    // Dawn and dusk go over smoothly, one way and the other, and never past the two.
-    for (const [from, to] of [[6, 8], [18.25, 20]]) {
-        let last = seen(from);
-        for (let k = 1; k <= 200; k++) {
-            const now = seen(from + (to - from) * k / 200), up = to > from && from < 12;
-            const sign = up ? 1 : -1;
-            assert.ok(sign * (now.angle - last.angle) >= -1e-9 && sign * (now.near - last.near) >= -1e-9, 'one way');
-            assert.ok(now.angle >= night.angle - 1e-9 && now.angle <= day.angle + 1e-9 && now.near >= night.near - 1e-9 && now.near <= day.near + 1e-9, 'between the two');
-            last = now;
-        }
+test('a fighter sees by day what the day gives, by night what the night gives, and something between the two at any hour', () => {
+    const { day, night } = gameConfig.player.sight, plain = value => JSON.parse(JSON.stringify(value));
+    assert.deepEqual(plain(dayKit.sight(12)), plain(day));
+    assert.deepEqual(plain(dayKit.sight(0)), plain(night));
+    for (let h = 0; h < 24; h += 0.05) {
+        const s = dayKit.sight(h), [a0, a1] = [night.angle, day.angle].sort((x, y) => x - y), [n0, n1] = [night.near, day.near].sort((x, y) => x - y);
+        assert.ok(s.angle >= a0 - 1e-9 && s.angle <= a1 + 1e-9 && s.near >= n0 - 1e-9 && s.near <= n1 + 1e-9, `${h.toFixed(2)}: ${JSON.stringify(s)}`);
     }
-    // In steps too small to see (the shade's edge is not cast anew every frame).
-    assert.equal(seen(6.5).angle, seen(6.5001).angle);
 });

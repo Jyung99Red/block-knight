@@ -29,7 +29,6 @@ test('a duel: two mortal fighters with the same stats, on the arena spawns, face
     for (const f of sim.fighters) {
         assert.deepEqual([f.hp, f.maxHp, f.atk, f.def, f.endless], [S.maxHp, S.maxHp, S.atk, S.def, false]);
         assert.deepEqual(plain(f.loadout), plain(gameConfig.gear.starter), 'the starter gear: a fair fight');
-        assert.deepEqual([S.maxHp, S.atk, S.def], [360, 30, 8]);
     }
     assert.ok(Math.abs(h.facing) < 1e-9 && Math.abs(Math.abs(g.facing) - Math.PI) < 1e-9);
     assert.ok(Math.hypot(g.x - h.x, g.y - h.y) >= 10 * U, 'they start well apart');
@@ -533,10 +532,8 @@ test('the edge of sight is exact: it ends at the blocks that hide, turns at thei
 
 // Sight is the same in the adventure and in a duel (core/combat.js `sees`,
 // core/terrain.js `sightFan`); it is tried here on the arena.
-test('a fighter sees the front 120 degrees by day and a small ring round itself, and not past a wall: a body behind it further off is not seen and the ground there is not lit (user, 2026-10-04)', () => {
-    const SIGHT = gameConfig.player.sight.day.angle, NEAR = gameConfig.player.sight.day.near, PV = { sightAngle: SIGHT };
-    assert.ok(Math.abs(SIGHT - 60 * Math.PI / 180) < 1e-12, '60 degrees either side (user, 2026-10-09; it was 75)');
-    assert.equal(NEAR, 2.5 * U, 'the ring is small: two and a half blocks (user, 2026-10-06; it was two)');
+test('a fighter sees the front arc and a small ring round itself, and not past a wall: a body behind it further off is not seen and the ground there is not lit (user, 2026-10-04)', () => {
+    const SIGHT = gameConfig.player.sight.day.angle, NEAR = gameConfig.player.sight.day.near, PV = { sightAngle: SIGHT }, EDGE = SIGHT * 180 / Math.PI;
     const sim = duel(), t = sim.terrain, [h, g] = sim.fighters, far = 30 * U;
     Object.assign(h, { x: 12 * U, y: 9.5 * U, facing: 0 });
     // The rival 2.9 blocks away, `deg` round from due east: past the ring
@@ -546,14 +543,14 @@ test('a fighter sees the front 120 degrees by day and a small ring round itself,
     // Due south of the fighter, where no pillar stands in the way, and the
     // fighter turned so that the rival is `off` degrees off where it faces.
     const by = (off, body = g, d = 2.9 * U, sight) => { at(90, body, d); h.facing = (90 - off) * Math.PI / 180; return combatKit.sees(t, h, body, sight); };
-    assert.deepEqual([0, 55, -55, 65, -65, 75, -75, 180].map(off => by(off)), [true, true, true, true, true, false, false, false]);
+    assert.deepEqual([0, EDGE - 5, 5 - EDGE, EDGE + 5, -EDGE - 5, EDGE + 8, -EDGE - 8, 180].map(off => by(off)), [true, true, true, true, true, false, false, false]);
     h.facing = Math.PI;
     assert.equal(at(180), true, 'turned round, it sees the other way');
     assert.equal(at(0), false);
     // A bigger body shows sooner: a monster as wide as the wolf king (a little further off, so that it too is past the ring).
     h.facing = 0;
     const big = { x: 0, y: 0, radius: gameConfig.monsters.wolfKing.radius };
-    assert.deepEqual([69, 77].map(off => [by(off, g, 3.1 * U), by(off, big, 3.1 * U)]), [[false, true], [false, false]]);
+    assert.deepEqual([EDGE + 9, EDGE + 17].map(off => [by(off, g, 3.1 * U), by(off, big, 3.1 * U)]), [[false, true], [false, false]]);
     h.facing = 0;
     // The ring: behind its back a body is seen once its nearer edge is within sightNear, whichever way the fighter faces.
     const behind = d => at(180, g, d);
@@ -612,17 +609,16 @@ test('a fighter sees the front 120 degrees by day and a small ring round itself,
     assert.ok(worst < 1.5, `the lit ground changes by at most ${worst} square blocks a step`);
 });
 
-test('at night a fighter sees only the front 90 degrees and a ring of a block and a half round itself (user, 2026-10-09)', () => {
+test('at night a fighter sees less than by day: a narrower arc and a smaller ring', () => {
     const { day, night } = gameConfig.player.sight, sim = duel(), t = sim.terrain, [h, g] = sim.fighters;
-    assert.ok(Math.abs(night.angle - 45 * Math.PI / 180) < 1e-12, '45 degrees either side');
-    assert.equal(night.near, 1.5 * U);
     Object.assign(h, { x: 12 * U, y: 9.5 * U, facing: 0 });
     // The rival due south (no pillar in the way), the fighter turned so that it is `off` degrees off where it faces.
     const south = (off, sight, d = 2.9 * U) => { Object.assign(g, { x: h.x, y: h.y + d }); h.facing = (90 - off) * Math.PI / 180; return combatKit.sees(t, h, g, sight); };
-    // Its nearer edge counts (5.9 degrees wide from there).
-    assert.deepEqual([0, 35, 45, 55].map(off => south(off, night)), [true, true, true, false]);
-    assert.deepEqual([0, 35, 45, 55].map(off => south(off, day)), [true, true, true, true], 'by day, 55 degrees off is still seen');
-    // The ring, behind its back: a body 2 blocks off is seen by day and not by night, one block off by both.
+    // Between the two arcs the rival is seen by day and not by night.
+    const between = (day.angle + night.angle) / 2 * 180 / Math.PI;
+    assert.deepEqual([south(between, day), south(between, night)], [true, false]);
+    // The ring, behind its back: a body between the two rings is seen by day and not by night, and one inside both by both.
     const behind = (d, sight) => { Object.assign(g, { x: h.x - d, y: h.y }); h.facing = 0; return combatKit.sees(t, h, g, sight); };
-    assert.deepEqual([behind(2 * U, day), behind(2 * U, night), behind(U, night)], [true, false, true]);
+    const mid = (day.near + night.near) / 2 + g.radius;
+    assert.deepEqual([behind(mid, day), behind(mid, night), behind(night.near, night)], [true, false, true]);
 });

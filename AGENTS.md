@@ -77,6 +77,8 @@ This file only changes when project setup changes.
 - Tests (user, 2026-10-08): a matter of judgement. Only logic a change
   could break needs its tests run (`node --test tests/<file>.test.cjs`);
   the picture and tuned numbers are the user's to judge, on the phone.
+  A test checks logic: only that is worth writing, never a tuned number
+  or a map's layout (user, 2026-10-09).
   `tests/browser-smoke.test.cjs` needs Playwright: on Windows, install
   `playwright-core` anywhere and set `PLAYWRIGHT_MODULE` to it and
   `PLAYWRIGHT_CHANNEL=chrome`.

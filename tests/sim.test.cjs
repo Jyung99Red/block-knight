@@ -132,10 +132,8 @@ test('from a standstill the walk builds up; heading away from the facing is slow
     assert.ok(Math.abs(b.p.speed / ahead.p.speed - (1 - P.turnSlow)) < 0.06, `turning round: ${(b.p.speed / ahead.p.speed).toFixed(2)}`);
     b.loop.run(0.6);
     assert.ok(Math.abs(b.p.speed - P.speed) < 1e-6, 'turned: full speed');
-    // The walk the user settled on (122, 2026-10-02), and the steps no
-    // hastier: under 4 a second. The run has a speed of its own (252).
-    assert.ok(P.speed === 122 && 2 * P.speed / playerAnim.cycleLength(W.create().rigs.fighters.player, 0) < 4);
-    assert.equal(P.runSpeed, 252);
+    // The steps no hastier than under 4 a second at the walk.
+    assert.ok(2 * P.speed / playerAnim.cycleLength(W.create().rigs.fighters.player, 0) < 4);
 });
 
 test('two seconds of unbroken walking turn into a run at runSpeed', () => {

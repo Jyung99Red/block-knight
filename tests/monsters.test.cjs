@@ -768,12 +768,11 @@ test('struck while still on patrol or alert it fights back at once; B moves push
     assert.equal(m.phase, 'chase');
 });
 
-test('bosses take ten stagger points to reel, other monsters three (user, 2026-10-02)', () => {
-    for (const kind of KINDS) assert.equal(monsterKit.threshold(kind), MON[kind].boss ? 10 : F.stagger.threshold, kind);
-    const sim = W.create({ region: 'valley' }), boss = sim.monsters.find(m => m.kind === 'wolfKing');
+test('a monster reels when its stagger points reach its threshold, not before', () => {
+    const sim = W.create({ region: 'valley' }), boss = sim.monsters.find(m => m.kind === 'wolfKing'), need = monsterKit.threshold('wolfKing');
     boss.phase = 'chase';
-    monsterKit.stagger(sim, boss, 9);
-    assert.equal(boss.phase, 'chase', 'nine points: still fighting');
+    monsterKit.stagger(sim, boss, need - 1);
+    assert.equal(boss.phase, 'chase', 'one point short: still fighting');
     monsterKit.stagger(sim, boss, 1);
     assert.equal(boss.phase, 'reel');
     assert.equal(boss.stagger, 0);
