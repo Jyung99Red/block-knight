@@ -2,7 +2,7 @@ const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const { load } = require('./load.cjs');
 const g = load();
-const { math3d: M, rigKit: R, playerModel, playerAnim, equipmentModels, space, gameConfig } = g;
+const { math3d: M, rigKit: R, playerModel, playerAnim, equipmentModels, space, gameConfig, worldSim: W } = g;
 
 const equipment = equipmentModels.forLoadout(gameConfig.gear.starter);
 const rig = R.build(playerModel, { equipment });
@@ -141,6 +141,51 @@ test('the stride matches the leg swing: the planted foot stays put, walking or r
         assert.ok(stepsPerSecond > cadence[0] && stepsPerSecond < cadence[1], `run ${runBlend}: ${stepsPerSecond.toFixed(2)} steps a second at full speed`);
     }
     assert.ok(playerAnim.cycleLength(rig, 1) > playerAnim.cycleLength(rig, 0), 'running strides are longer');
+});
+
+test('in a move the feet do not slide: each stands where it is or is lifted and stepped; the smite, which takes no step, keeps both where the backslash left them (user, 2026-10-09)', () => {
+    // A combo through the simulation (each next key pressed during the
+    // swing before), the feet where they are drawn in the world.
+    function trace(main, inputs) {
+        const sim = W.create({ loadout: { ...gameConfig.gear.starter, main } }), p = sim.player, body = sim.rigs.fighters[p.id];
+        sim.dummy.wait = 1e9; sim.dummy.x += 400;
+        const feet = ['R', 'L'].map(s => body.parts.findIndex(q => q.tag === 'foot' && body.bones[q.bone].name === `shin${s}`));
+        const out = [], left = [...inputs];
+        const press = input => {
+            W.command(sim, { type: 'press', button: 'attack' });
+            if (input === 'b') for (let i = 0; i < 20; i++) W.step(sim, 0.01);
+            W.command(sim, { type: 'release', button: 'attack' });
+        };
+        press(left.shift());
+        for (let i = 0; i < 500 && (p.act || left.length); i++) {
+            if (left.length && p.act?.phase === 'swing' && !p.buffer) press(left.shift());
+            W.step(sim, 0.01);
+            const s = R.solve(body, playerAnim.pose(body, p), space.toBlocks(p.x, p.y, p.h), space.yawOf(p.facing));
+            out.push({ key: p.act ? `${p.act.phase}:${p.act.move}` : 'idle', feet: feet.map(i => ({ x: s.parts[i][12], z: s.parts[i][14], low: Math.min(...M.corners(M.obb(s.parts[i], half(body.parts[i]))).map(c => c[1])) })) });
+        }
+        return out;
+    }
+    const routes = { wooden_sword: ['aaa', 'aab', 'ab', 'ba'], assassin_dagger: ['aaaaa', 'aba', 'ab', 'ba'] };
+    for (const [main, list] of Object.entries(routes)) for (const inputs of list) {
+        const frames = trace(main, inputs.split('')), slid = {};
+        for (let i = 1; i < frames.length; i++) {
+            const a = frames[i - 1], b = frames[i];
+            // A move started past its windup (a held B) begins as its swing does.
+            if (a.key !== b.key) continue;
+            [0, 1].forEach(k => {
+                if (a.feet[k].low > 0.003 || b.feet[k].low > 0.003) return;
+                slid[`${b.key} ${'RL'[k]}`] = (slid[`${b.key} ${'RL'[k]}`] || 0) + Math.hypot(b.feet[k].x - a.feet[k].x, b.feet[k].z - a.feet[k].z);
+            });
+        }
+        // A foot on the ground may trail a swing's short step a little.
+        for (const [where, d] of Object.entries(slid)) assert.ok(d < 0.05, `${main} ${inputs}: ${where} slides ${d.toFixed(3)} blocks on the ground`);
+        if (main !== 'wooden_sword' || inputs !== 'aaa') continue;
+        const smite = frames.filter(f => f.key === 'windup:smite' || f.key === 'swing:smite');
+        for (const k of [0, 1]) {
+            const xs = smite.map(f => f.feet[k].x), zs = smite.map(f => f.feet[k].z);
+            assert.ok(Math.max(...xs) - Math.min(...xs) < 0.005 && Math.max(...zs) - Math.min(...zs) < 0.005, `the smite moves the ${'RL'[k]} foot`);
+        }
+    }
 });
 
 test('walking while charging moves the legs under the held charge', () => {

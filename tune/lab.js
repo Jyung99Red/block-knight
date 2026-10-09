@@ -385,7 +385,7 @@ const moveLab = (() => {
             body: {
                 gait: p.gait, moveBlend: p.moveBlend, runBlend: p.runBlend, guardBlend: p.guardBlend, shoveOut: p.shoveOut, shoveFor: p.shoveFor, stun: p.stun, down: p.down, downT: p.downT,
                 drink: p.drink && { ...p.drink },
-                act: p.act && { move: p.act.move, phase: p.act.phase, t: p.act.t, lead: p.act.lead, from: p.act.from && { ...p.act.from } }
+                act: p.act && { move: p.act.move, phase: p.act.phase, t: p.act.t, lead: p.act.lead, stepTotal: p.act.stepTotal, from: p.act.from && { ...p.act.from } }
             },
             dummy: d && { x: d.x - x0, y: d.y - y0, h: 0, facing: d.facing, phase: d.phase, t: d.t, move: d.move, flinch: d.flinch }
         });

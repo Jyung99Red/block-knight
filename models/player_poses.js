@@ -48,6 +48,10 @@ const playerPoses = Object.freeze({
         carry: { forearmR: { rx: -0.55 }, handR: { rx: -0.45 } },
         flight: { height: 0.09 }
     },
+    // The feet in a move (core/player_anim.js): a foot that steps is lifted
+    // `liftPerBlock` of the step's length, `lift` blocks at most; where a
+    // foot cannot reach the ground the hips go down, `sink` blocks at most.
+    feet: { lift: 0.09, liftPerBlock: 0.35, sink: 0.12 },
     // Breathing while idle; drawn only, never part of a hit test.
     breath: { rate: 2.2, chest: 0.012, head: -0.008, arms: 0.02 }
 });

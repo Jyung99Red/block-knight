@@ -141,6 +141,143 @@ const playerAnim = (() => {
         return torchRest ??= Object.freeze({ ...playerPoses.stance, ...playerMoves.torch });
     }
 
+    // ---- the feet in a move (design.md 2.4): they never slide ----
+    // A foot is planted, standing where it is on the ground (through the
+    // swing's step too: the body goes on over it), or stepping: lifted off
+    // and set down where the next key puts it. Keys say where the feet go
+    // (`spotsOf`); a move without a step keeps both feet where it found
+    // them (user, 2026-10-09). The legs are then turned to reach (`reach`):
+    // the hips as high as the keys hold them, lower only where a foot
+    // cannot reach.
+    const legRigs = new WeakMap();
+    function legsOf(rig) {
+        if (!legRigs.has(rig)) legRigs.set(rig, ['R', 'L'].map(side => {
+            const thigh = rig.index[`thigh${side}`], shin = rig.index[`shin${side}`], foot = footOf(rig, side);
+            const knee = rig.bones[shin].at[1], sole = rig.parts[foot].at, r = Math.hypot(sole[1], sole[2]);
+            return { thigh, shin, foot, hip: rig.bones[thigh].at, knee, sole, r, bend: Math.atan2(sole[2], -sole[1]), long: Math.abs(knee) + r };
+        }));
+        return legRigs.get(rig);
+    }
+    // Where a pose stands its feet: [x, z, y] in the body's frame,
+    // grounded, y the height of the boot's middle (a key may hold a foot a
+    // little off the ground: it is kept so, the key as it was made). Kept
+    // per rig and key, but worked out anew on the move tuner's page, whose
+    // edits change the keys.
+    const spotRigs = new WeakMap();
+    function spotsOf(rig, pose) {
+        const keep = globalThis.unfrozenConfig !== true;
+        if (!spotRigs.has(rig)) spotRigs.set(rig, new WeakMap());
+        const kept = spotRigs.get(rig);
+        if (keep && kept.has(pose)) return kept.get(pose);
+        const solved = rigKit.solve(rig, grounded(rig, pose));
+        const spots = legsOf(rig).map(l => [solved.parts[l.foot][12], solved.parts[l.foot][14], solved.parts[l.foot][13]]);
+        if (keep) kept.set(pose, spots);
+        return spots;
+    }
+    // From spots `from` to `to` over s (0..1), each foot lifted on an arc
+    // as high as its step is long allows (`raised` false: not lifted, where
+    // it would be set down); [x, z, y, arc] each, y counting the arc.
+    // Standing, one foot at a time (the one going forward first, each
+    // taking the time its step is long, easing in and out). `ahead`: how
+    // far the body itself goes meanwhile (s eased as it goes), the feet
+    // going with it together; one that stays in the world goes as far back
+    // in the body's frame, unlifted.
+    function stepTo(from, to, s, ahead = 0, raised = true) {
+        const F = playerPoses.feet, far = from.map((f, i) => Math.hypot(to[i][0] - f[0], to[i][1] + ahead - f[1]));
+        const first = to[0][1] - from[0][1] >= to[1][1] - from[1][1] ? 0 : 1, split = ahead ? 1 : far[first] / (far[0] + far[1] || 1);
+        return from.map((f, i) => {
+            const t = to[i], k = ahead ? s : smooth(clamp01(i === first ? s / (split || 1) : (s - split) / (1 - split || 1)));
+            // A foot still in the air from the step before comes down meanwhile.
+            const was = f[2] - (f[3] || 0), arc = (f[3] || 0) * (1 - smooth(clamp01(2 * s))) + (raised ? Math.min(F.lift, F.liftPerBlock * far[i]) * Math.sin(Math.PI * k) : 0);
+            return [f[0] + (t[0] - f[0]) * k, f[1] + (t[1] + ahead - f[1]) * k - ahead * s, was + (t[2] - was) * k + arc, arc];
+        });
+    }
+    const stillOf = id => { const m = gameConfig.combo.moves[id]; return !m.step && !m.chargeStep; };
+    // A move's recovery, from where its swing left the feet back to the
+    // rest: they keep the cut's stance up to the derive point (the next move
+    // of a combo takes them as they are), then step back.
+    function recoverFeet(rig, id, t, rest, swungTo, raised) {
+        const m = gameConfig.combo.moves[id], start = m.derive || 0;
+        return stepTo(swungTo, spotsOf(rig, rest), clamp01((t - start) / Math.max(1e-9, m.recovery - start)), 0, raised);
+    }
+    // Where a move's swing left the feet: on its key `b`, or, for a move
+    // without a step, where it found them (`from`: what it cut short).
+    const swungOf = (rig, id, from, rest) => stillOf(id) ? foundOf(rig, from, rest, false) : spotsOf(rig, playerMoves.moves[id].b);
+    // Where a move found the feet: the rest, or the recovery it cut short.
+    const foundOf = (rig, from, rest, raised = true) => from ? recoverFeet(rig, from.move, from.t, rest, swungOf(rig, from.move, from.from, rest), raised) : spotsOf(rig, rest);
+    // The feet at a moment of the move `act`, in the body's frame as it is
+    // then (the swing's step taken so far is behind it). A move without a
+    // step sets them down where it found them, and they stay there.
+    function feetOf(rig, act, rest) {
+        const m = gameConfig.combo.moves[act.move], K = playerMoves.moves[act.move], still = stillOf(act.move);
+        const found = foundOf(rig, act.from, rest), a = still ? foundOf(rig, act.from, rest, false) : spotsOf(rig, K.a);
+        if (act.phase === 'windup') {
+            const lead = act.lead || 0;
+            return stepTo(found, a, clamp01(m.windup > lead ? (act.t - lead) / (m.windup - lead) : 1));
+        }
+        if (act.phase === 'charge') return a;
+        // The swing: the feet go as the body goes its `step` forward
+        // (core/fighter.js), easing out; one the keys leave where it stood
+        // in the world stays planted.
+        const b = still ? a : spotsOf(rig, K.b);
+        if (act.phase === 'swing') {
+            const u = clamp01(act.t / m.swing);
+            return stepTo(a, b, 1 - (1 - u) * (1 - u), (act.stepTotal ?? m.step) / gameConfig.world.unitsPerBlock);
+        }
+        return recoverFeet(rig, act.move, act.t, rest, b);
+    }
+    // Turn the legs of `pose` so the feet stand on `feet` ([x, z, y, arc]
+    // in the body's frame, y the boot's middle). The hips go down for a foot
+    // that would not reach the ground under its arc (so they do not bob up
+    // as it lifts). The thigh keeps its turn (ry) from the pose, less the
+    // hips'; the knee bends as the pose has it, never backwards. With no
+    // ankle, a boot rocks on its heel or toe as the leg tilts (never into
+    // the ground, and clear of it when stepping). Also gives `low`, the
+    // body's lowest point, so the ground does not move it.
+    function reach(rig, pose, feet) {
+        const legs = legsOf(rig), k = rig.scale, out = grounded(rig, pose), solved = rigKit.solve(rig, out);
+        const P = solved.bones[rig.index.pelvis], X = [P[0], P[1], P[2]], Y = [P[4], P[5], P[6]], Z = [P[8], P[9], P[10]];
+        const goals = legs.map((l, i) => ({ H: math3d.transformPoint(P, l.hip), T: [feet[i][0], feet[i][2], feet[i][1]], arc: feet[i][3] || 0 }));
+        // Lower the hips where a straight leg would not reach, but only so
+        // far: past that the foot falls short (a long lunge drags it).
+        let drop = 0;
+        goals.forEach(({ H, T, arc }, i) => {
+            const flat = Math.hypot(T[0] - H[0], T[2] - H[2]), most = legs[i].long;
+            drop = Math.max(drop, H[1] - T[1] + arc - Math.sqrt(Math.max(0, most * most - flat * flat)));
+        });
+        drop = Math.min(drop, playerPoses.feet.sink * k);
+        out.base = { ...out.base, py: (out.base?.py || 0) - drop / k };
+        const aim = (l, H, T) => {
+            const w = [T[0] - H[0], T[1] - H[1] + drop, T[2] - H[2]];
+            // In the hips' frame, then out of the thigh's turn; turning the
+            // hips does not turn the planted feet.
+            const t = [math3d.dot(w, X), math3d.dot(w, Y), math3d.dot(w, Z)], ry = (pose[rig.bones[l.thigh].name]?.ry || 0) - (pose.pelvis?.ry || 0);
+            const u = [Math.cos(ry) * t[0] - Math.sin(ry) * t[2], t[1], Math.sin(ry) * t[0] + Math.cos(ry) * t[2]];
+            const d = Math.min(l.long, Math.max(Math.abs(Math.abs(l.knee) - l.r) + 1e-6, Math.hypot(...u)));
+            // The knee: how far it bends for the reach d. Of the two ways,
+            // the one nearer the pose's (a key may hold it a hair past
+            // straight), but never bent backwards.
+            const c = (d * d - l.knee * l.knee - l.r * l.r) / (2 * l.knee), was = pose[rig.bones[l.shin].name]?.rx || 0;
+            const A = Math.acos(Math.min(1, Math.max(-1, -c / l.r))), shin = l.bend - A >= -0.02 && Math.abs(l.bend - A - was) < Math.abs(l.bend + A - was) ? l.bend - A : l.bend + A;
+            const v = [0, l.knee + l.sole[1] * Math.cos(shin) - l.sole[2] * Math.sin(shin), l.sole[1] * Math.sin(shin) + l.sole[2] * Math.cos(shin)];
+            const s = d / (Math.hypot(...u) || 1), g = [u[0] * s, u[1] * s, u[2] * s];
+            // The thigh: out to the side (rz), then forward or back (rx).
+            const rz = Math.asin(Math.min(1, Math.max(-1, -g[0] / v[1])));
+            const rx = Math.atan2(g[2], g[1]) - Math.atan2(v[2], Math.cos(rz) * v[1]);
+            out[rig.bones[l.thigh].name] = { rx: Math.atan2(Math.sin(rx), Math.cos(rx)), ry, rz };
+            out[rig.bones[l.shin].name] = { rx: shin };
+        };
+        goals.forEach(({ H, T }, i) => aim(legs[i], H, T));
+        // A boot tipped into the ground (toe or heel), or dragging it when
+        // stepping, is raised: its lowest corner as high as its arc.
+        const tipped = rigKit.solve(rig, out);
+        goals.forEach(({ H, T, arc }, i) => {
+            const under = arc - Math.min(...math3d.corners(math3d.obb(tipped.parts[legs[i].foot], rig.parts[legs[i].foot].size.map(v => v / 2))).map(c => c[1]));
+            if (under > 0) aim(legs[i], H, [T[0], T[1] + under, T[2]]);
+        });
+        return { pose: out, low: rigKit.lowest(rig, rigKit.solve(rig, out)) };
+    }
+
     // The legs under a guard. The pose's legs are the stance's turning into
     // the stride by moveBlend: the guard's standing legs take the stance's
     // share, and the stride's share is bent.
@@ -163,7 +300,7 @@ const playerAnim = (() => {
     // fighter { act, guardBlend, shoveOut, shoveFor, stun, down, downT, drink,
     // handOut, loadout }.
     function pose(rig, body) {
-        let pose = locomotion(rig, body), stepping = 1;
+        let pose = locomotion(rig, body), stepping = 1, footing = 0;
         const act = body.act, lowerBody = playerModel.layers.lower, rest = restOf(body.loadout);
         // A torch is carried up and forward when the arm is not busy (a
         // move cross-fades in over the carry, and goes back to it).
@@ -172,14 +309,17 @@ const playerAnim = (() => {
             // Out of a walk the move cross-fades in; out of a move it does not need to.
             const w = act.from || act.phase !== 'windup' ? 1 : clamp01((act.t - (act.lead || 0)) / BLEND());
             if (act.phase !== 'charge') stepping = 1 - w;
-            let moving = movePose(act, rest);
+            // The feet planted, or stepping (feetOf), and the body as high as
+            // they put it (with both off the ground at once, it is up too).
+            // Standing, the legs are the move's at once: its feet start where
+            // the stance has them.
+            const legs = 1 - (1 - w) * (body.moveBlend || 0), placed = reach(rig, movePose(act, rest), feetOf(rig, act, rest));
+            let moving = placed.pose;
+            footing = placed.low * legs;
             // Charging may walk: the legs walk under the held charge, like
             // under a raised shield.
-            if (act.phase === 'charge') {
-                const lower = playerModel.layers.lower;
-                moving = { ...moving, ...rigKit.mix(rigKit.pick(moving, lower), rigKit.pick(pose, lower), body.moveBlend) };
-            }
-            pose = rigKit.mix(pose, moving, w);
+            if (act.phase === 'charge') moving = { ...moving, ...rigKit.mix(rigKit.pick(moving, lowerBody), rigKit.pick(pose, lowerBody), body.moveBlend) };
+            pose = { ...rigKit.mix(pose, moving, w), ...rigKit.mix(rigKit.pick(pose, lowerBody), rigKit.pick(moving, lowerBody), legs) };
         }
         // Interacting: the left hand goes a little forward (not in a move).
         if (!act && body.handOut > 0) pose = rigKit.mix(pose, { ...pose, ...playerMoves.reach }, smooth(clamp01(body.handOut)));
@@ -208,7 +348,7 @@ const playerAnim = (() => {
             const left = clamp01(body.stun / gameConfig.combat.hitStun), k = left > 0.8 ? (1 - left) / 0.2 : left / 0.8;
             pose = rigKit.add(pose, rigKit.scale(playerMoves.flinch, k));
         }
-        const air = lift(rig, body.gait, body.runBlend || 0) * body.moveBlend * stepping;
+        const air = lift(rig, body.gait, body.runBlend || 0) * body.moveBlend * stepping + (body.down ? 0 : footing);
         return air > 0 ? rigKit.add(grounded(rig, pose), { base: { py: air } }) : grounded(rig, pose);
     }
     // Drawn-only additions. `look` = { time, lean } (lean in radians).
