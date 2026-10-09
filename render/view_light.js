@@ -103,10 +103,13 @@ const viewLight = (() => {
         const sun = new T.DirectionalLight(now.colors[2], now.sun), extent = C.graphics.shadowExtent;
         // The torch's light: always there (lights coming and going would
         // rebuild every shader), at zero while no torch burns, its shadow
-        // map then not redrawn. Then the moving lights without shadows
-        // (graphics.lights): each frame they go to the nearest of what
-        // gives light -- a burning thicket, a doorway's glow, someone
-        // else's torch -- and the rest of them are at zero.
+        // map then not redrawn. Then the moving lights without shadows:
+        // as many as the world has things that give light -- a burning
+        // thicket, a doorway's glow, someone else's torch, a torch that
+        // stands in the map (user, 2026-10-09: no limit) -- less the
+        // standing torches' that cast. Each frame they go to what gives
+        // light and can fall on the picture (`frame`), the nearest first,
+        // and the rest of them are at zero.
         // (Its shadow map's size and softness: `retune`.)
         const torchLight = new T.PointLight(P.flame, 0, TORCH.reach, TORCH.decay);
         torchLight.castShadow = true;
@@ -143,17 +146,21 @@ const viewLight = (() => {
             scene.add(light);
             return { light, lamp: null, strength: 0, drawn: false, stale: 0, near: false, age: 0, rev: -1 };
         });
-        const pool = Array.from({ length: C.graphics.lights }, () => {
+        // (A doorway's glow only in a dark region: `doorways`, below.)
+        const doorways = dark ? sim.entities.filter(e => e.type === 'portal').map(e => space.toBlocks(e.x + Math.cos(e.facing) * DOORWAY.inside * U, e.y + Math.sin(e.facing) * DOORWAY.inside * U, 0)).map(([x, , z]) => [x, DOORWAY.height, z]) : [];
+        const lampCount = sim.entities.filter(e => e.type === 'lamp').length;
+        const gives = lampCount + sim.entities.filter(e => e.type === 'brush').length + doorways.length + Math.max(0, sim.fighters.length - 1);
+        const pool = Array.from({ length: Math.max(0, gives - Math.min(casters.length, lampCount)) }, () => {
             const light = new T.PointLight('#ffffff', 0, 1, 1);
             scene.add(light);
             return light;
         });
         const glowColour = new T.Color();
-        // The nearest of `glowing` ({ at: [x, y, z], color, intensity,
-        // reach, decay; lamp: the standing torch it is, if one }, blocks)
-        // to `me` are lit, as many as there are moving lights. Of the
-        // standing torches among them the nearest have the lights that
-        // cast, the rest of what is lit the moving lights. A standing
+        // All of `glowing` ({ at: [x, y, z], color, intensity, reach,
+        // decay; lamp: the standing torch it is, if one }, blocks) are
+        // lit, the nearest to `me` first. Of the standing torches among
+        // them the nearest have the lights that cast, the rest of what is
+        // lit the moving lights. A standing
         // torch's shadows come and go over SHADE.fade seconds as it gets
         // and loses its turn (a world's first frame shows them whole);
         // while they go, the one that takes its turn waits unshadowed.
@@ -167,7 +174,7 @@ const viewLight = (() => {
         function kindle(glowing, me, frameSeconds, stirring, rev) {
             const [x, , z] = space.toBlocks(me.x, me.y, me.h), far = g => (g.at[0] - x) ** 2 + (g.at[2] - z) ** 2;
             glowing.sort((a, b) => far(a) - far(b));
-            const lit = glowing.slice(0, pool.length), holder = lamp => casters.find(c => c.lamp === lamp), litAs = c => c.lamp && lit.find(g => g.lamp === c.lamp);
+            const lit = glowing, holder = lamp => casters.find(c => c.lamp === lamp), litAs = c => c.lamp && lit.find(g => g.lamp === c.lamp);
             // Whose turn: one that casts already keeps it against one less than SHADE.keep blocks nearer.
             const turn = lit.filter(g => g.lamp).map(g => [g.lamp, Math.sqrt(far(g)) - (holder(g.lamp) ? SHADE.keep : 0)])
                 .sort((a, b) => a[1] - b[1]).slice(0, casters.length).map(([lamp]) => lamp);
@@ -251,7 +258,6 @@ const viewLight = (() => {
                 };
             }
         }
-        const doorways = dark ? sim.entities.filter(e => e.type === 'portal').map(e => space.toBlocks(e.x + Math.cos(e.facing) * DOORWAY.inside * U, e.y + Math.sin(e.facing) * DOORWAY.inside * U, 0)).map(([x, , z]) => [x, DOORWAY.height, z]) : [];
         Object.assign(sun.shadow.camera, { left: -extent, right: extent, top: extent, bottom: -extent, near: 1, far: 60 });
         sun.shadow.bias = -0.0004; sun.shadow.normalBias = 0.03;
         scene.add(sun, sun.target);
@@ -308,8 +314,11 @@ const viewLight = (() => {
         // `stirring`: where the props that move are ([x, z], blocks;
         // render/view_props.js); `near`: what the lights nearest to are lit
         // for ({ x, y, h }, world units; the fighter, or what the title
-        // screen's camera looks at).
-        function frame(current, { me, near = me, drawn, shownOf, clock, frameSeconds, lamps = [], stirring = [] }) {
+        // screen's camera looks at); `picture`: what the fighter's camera
+        // shows ({ look: [x, z], yaw, view }: core/space.js `sight`), or
+        // null where it is not worked out (the title screen: all of the
+        // lights are lit). A light that cannot reach the picture is out.
+        function frame(current, { me, near = me, picture = null, drawn, shownOf, clock, frameSeconds, lamps = [], stirring = [] }) {
             // The hour's light.
             const hour = dayKit.hourOf(current, tune.hourShift);
             daylight(hour);
@@ -399,7 +408,9 @@ const viewLight = (() => {
                 if (!was || was.length !== at.length || at.some((v, i) => Math.abs(v[0] - was[i][0]) + Math.abs(v[1] - was[i][1]) + Math.abs(v[2] - was[i][2]) > least)) moving.push(where(d.shown));
                 spots.set(d.id, at);
             }
-            kindle(glowing, near, frameSeconds, moving, current.terrain.rev);
+            // (The block light is the same for all of them, seen or not: a
+            // cell's glow is a texel.)
+            kindle(picture ? glowing.filter(g => space.pictureReaches(picture.look, picture.yaw, picture.view, g.at[0], g.at[2], g.reach)) : glowing, near, frameSeconds, moving, current.terrain.rev);
             ground.glow(glows, now.torch * GLOW.power);
         }
         // (The shadow maps are the lights' own render targets.)

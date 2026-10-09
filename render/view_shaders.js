@@ -82,11 +82,12 @@ shadow /= float( pointShadowTaps );${chunk.slice(to + end.length)}`;
     }
     // A point light that is out is passed over whole: the torch while it
     // does not burn, and the moving lights nothing has been given
-    // (graphics.lights; all of them, by day in the open). They are always
-    // in the shader, and the engine works each one out at every pixel to
-    // add nothing: by Vulkan, the five of them out were over a quarter of
-    // a frame by day. A three.js whose shader reads otherwise is left as
-    // it is.
+    // (render/view_light.js; those that cannot fall on the picture are
+    // among them). They are always in the shader, and the engine works
+    // each one out at every pixel to add nothing: by Vulkan, five of them
+    // out (the torch and four moving lights, as it was) were over a
+    // quarter of a frame by day. A three.js whose shader reads otherwise
+    // is left as it is.
     function darkLightsSkipped(T) {
         const chunk = T.ShaderChunk.lights_fragment_begin, from = chunk.indexOf('#if ( NUM_POINT_LIGHTS > 0 )');
         const first = 'getPointLightInfo( pointLight, geometryPosition, directLight );', last = 'RE_Direct( directLight, geometryPosition, geometryNormal, geometryViewDir, geometryClearcoatNormal, material, reflectedLight );';

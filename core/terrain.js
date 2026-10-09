@@ -212,6 +212,28 @@ const terrainKit = (() => {
             if (!moved) return;
         }
     }
+    // The ground a body can come to from where it starts, as the box round
+    // it, [x0, z0, x1, z1] in blocks (3D's x and z): the open cells joined to
+    // a spawn, a thicket or an ore that can be cleared counting as open.
+    // Ground seen over a low wall but never walked to (the far side of a
+    // gate in a wall, say) lies outside it. The camera keeps to it
+    // (core/space.js `holdCamera`).
+    function reachOf(t) {
+        const clears = kind => isOpen(kind) || kind === KIND.brush || RESOURCE.has(kind);
+        const seen = new Uint8Array(t.width * t.height), queue = [];
+        const add = (c, r) => {
+            if (!inside(t, c, r) || seen[r * t.width + c] || !clears(kindAt(t, c, r))) return;
+            seen[r * t.width + c] = 1; queue.push(c, r);
+        };
+        for (const s of t.spawns) add(s.col, s.row);
+        let x0 = Infinity, z0 = Infinity, x1 = -Infinity, z1 = -Infinity;
+        for (let i = 0; i < queue.length; i += 2) {
+            const c = queue[i], r = queue[i + 1];
+            x0 = Math.min(x0, c); z0 = Math.min(z0, r); x1 = Math.max(x1, c + 1); z1 = Math.max(z1, r + 1);
+            add(c + 1, r); add(c - 1, r); add(c, r + 1); add(c, r - 1);
+        }
+        return [x0, z0, x1, z1];
+    }
     // Is the straight line between two ground points free of solid blocks?
     // Sampled every eighth of a block; heights are not considered (a blow
     // across any wall does not land: design.md 4.3). A pond is no block.
@@ -482,6 +504,6 @@ const terrainKit = (() => {
         CHUNK, MAX_LEVEL, KIND, NAMES, TREE_HEIGHT, HOUSE_HEIGHT, PORTAL_HEIGHT, BRUSH_HEIGHT, MONSTERS, LAMPS,
         cellOf, fromRows, inside, kindAt, levelAt, solidAt, closedAt, isSolid, isOpen, isResource, generated, cellCentre,
         chunkIndex, chunkCells, set, edits, applyEdits,
-        blocked, lineClear, sightClear, sightFan, moveCircle, openWay, wayTo
+        blocked, reachOf, lineClear, sightClear, sightFan, moveCircle, openWay, wayTo
     };
 })();

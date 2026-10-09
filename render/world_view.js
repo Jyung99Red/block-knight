@@ -51,7 +51,7 @@ const worldView = (() => {
         // multiplier, and the picture quality's (graphics.quality): sun
         // shadows and the size of the sun's and the torch's shadow maps
         // (texels a side; a large screen's sun map twice a phone's, at most
-        // SUN_LARGEST), how many moving lights, and what the shaders are
+        // SUN_LARGEST), and what the shaders are
         // built with (`built`: torch shadow samples, the probes' light
         // and block light, how many standing torches cast shadows, which
         // need a new world when they change).
@@ -169,6 +169,9 @@ const worldView = (() => {
         const scene = new T.Scene(), tx = renderTextures.create(T);
         // ---- terrain: chunk meshes (render/terrain_mesh.js) ----
         const t = sim.terrain;
+        // The ground the fighter can come to, which the camera keeps to
+        // (core/space.js `holdCamera`).
+        const roam = terrainKit.reachOf(t);
         const ground = terrainMesh.create(T, scene, sim, tx, { probes: tune.built.bounce });
         // What the world's parts (render/view_*.js) share: each is made
         // from this alone (and the props from the characters' maker too,
@@ -280,12 +283,17 @@ const worldView = (() => {
                 return ground.hides(eyeAt, bodyAt);
             });
         }
+        // How far the camera stands from the point it looks at (blocks).
+        const standoff = () => tune.distance * tune.zoom * Math.max(1, 1.05 / camera.aspect);
+        // What the picture shows round that point, looking `pitch` down
+        // (core/space.js `sight`).
+        const pictureOf = pitch => space.sight({ pitch, fov: camera.fov, aspect: camera.aspect, distance: standoff(), lookHeight: C.camera.lookHeight });
         // The camera `yaw` round the point (x, y, z), blocks (0: due south
         // of it), looking `pitch` down. Returns how far beyond that point the middle of the
         // ground on screen lies (blocks, along the ground): the screen
         // shows further beyond the fighter than short of it.
         function placeCamera(x, y, z, yaw, pitch) {
-            const cam = C.camera, fit = Math.max(1, 1.05 / camera.aspect), d = tune.distance * tune.zoom * fit, cp = Math.cos(pitch);
+            const cam = C.camera, d = standoff(), cp = Math.cos(pitch);
             const [jx, jy] = effects.jitter(), tx0 = x + jx, ty0 = y + cam.lookHeight + jy, tz0 = z;
             camera.position.set(tx0 + Math.sin(yaw) * cp * d, ty0 + Math.sin(pitch) * d, tz0 + Math.cos(yaw) * cp * d);
             camera.lookAt(tx0, ty0, tz0);
@@ -359,6 +367,11 @@ const worldView = (() => {
             const shownOf = body => bodies?.get(body.id) || body;
             const me = shownOf(current.fighters.find(f => f.id === selfId) || current.fighters[0]);
             const view = shot ? shotView(shot, me) : null, U = C.world.unitsPerBlock;
+            // Where the camera looks: at the fighter, held back near the
+            // edge of the ground it can come to (camera.edge).
+            const at = space.toBlocks(me.x, me.y, me.h);
+            const picture = view ? null : pictureOf(pitch);
+            const look = view ? null : space.holdCamera([at[0], at[2]], yaw, picture, { reach: roam, edge: C.camera.edge, far: FAR });
             // What this fighter does not see is not drawn: a rival, a
             // monster or the dummy behind its back or behind a wall. The
             // title screen's camera is not the fighter's: everything is
@@ -388,7 +401,7 @@ const worldView = (() => {
             // The hour's light (render/view_light.js); colours fade as its
             // look has them, the terrain's and other bodies'.
             const near = view ? { x: view.look[0] * U, y: view.look[2] * U, h: 0 } : me;
-            light.frame(current, { me, near, drawn, shownOf, clock, frameSeconds, lamps: props.lamps, stirring: props.stirring(current) });
+            light.frame(current, { me, near, picture: view ? null : { look, yaw, view: picture }, drawn, shownOf, clock, frameSeconds, lamps: props.lamps, stirring: props.stirring(current) });
             ground.fade.value = light.now.fade[0]; cast.fade.value = light.now.fade[1];
             const foes = [];
             if (dummyView && current.dummy) {
@@ -397,7 +410,7 @@ const worldView = (() => {
                 if (visible) { seen.add(current.dummy.id); dummyView.place(dummyKit.solve(current)); foes.push({ body: current.dummy, view: dummyView, top: 1.95 }); }
             }
             // Monsters, and the props that are drawn near enough, are within FAR of the camera's focus.
-            const focus = view ? view.look : space.toBlocks(me.x, me.y, me.h);
+            const focus = view ? view.look : [look[0], at[1], look[1]];
             for (const m of current.monsters) {
                 if (!monsters.has(m.id)) monsters.set(m.id, monsterView(m));
                 const entry = monsters.get(m.id);
@@ -418,7 +431,6 @@ const worldView = (() => {
             ground.update();
             effects.onEvents(events, selfId);
             effects.update(frameSeconds, current, { selfId, fighters: drawn, foes });
-            const at = space.toBlocks(me.x, me.y, me.h);
             sight.update(at[0], at[2], me.facing);
             sight.show(!view);
             if (view) {
@@ -431,8 +443,8 @@ const worldView = (() => {
             }
             // The sun's shadows lie round the middle of the ground on
             // screen, so they reach its far corners as they do its near ones.
-            const ahead = placeCamera(at[0], at[1], at[2], yaw, pitch);
-            light.placeSun(at[0] - Math.sin(yaw) * ahead, at[1], at[2] - Math.cos(yaw) * ahead);
+            const ahead = placeCamera(look[0], at[1], look[1], yaw, pitch);
+            light.placeSun(look[0] - Math.sin(yaw) * ahead, at[1], look[1] - Math.cos(yaw) * ahead);
             // Cut the blocks between the camera and this fighter's chest,
             // while some do hide the fighter; the hole eases open and shut.
             ground.cut.center.value.set(at[0], at[1] + 1, at[2]);

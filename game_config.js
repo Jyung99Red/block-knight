@@ -430,6 +430,11 @@ const gameConfig = (() => {
         // distant picture that shows about as much. The sliders stay on
         // the screen for now: ui/app.js). zoom: the
         // distance multiplier each camera setting of the menu picks.
+        // edge: the camera stops following the fighter near the edge of
+        // the ground it can walk to (terrainKit.reachOf), so as not to show
+        // what lies past the map: the picture shows no more than this many
+        // blocks beyond that ground, which puts the fighter standing at its
+        // edge this far short of the picture's (user, 2026-10-09: 2 to 3).
         //
         // title: the title screen's camera (design.md 3.6; user,
         // 2026-10-08): not the fighter's; shot after shot, `seconds` each,
@@ -445,7 +450,7 @@ const gameConfig = (() => {
         // stands, a share of the screen's width (the name and the keys are
         // on the left).
         camera: {
-            yaw: 0, pitch: 1.01, distance: 16, fov: 30, lookHeight: 0.8, zoom: { near: 0.87, mid: 1, far: 1.13 },
+            yaw: 0, pitch: 1.01, distance: 16, fov: 30, lookHeight: 0.8, edge: 2.5, zoom: { near: 0.87, mid: 1, far: 1.13 },
             title: {
                 seconds: 7, fade: 0.7, shift: 0.16, fov: 45,
                 things: { building: [5, 1.4], portal: [3.5, 1.5], chest: [1.8, 0.5], stand: [2, 1.1], dummy: [2.4, 1] },
@@ -475,9 +480,11 @@ const gameConfig = (() => {
         // lampShadows, how many of the torches that stand in a map cast
         // shadows, the nearest (user, 2026-10-07; none on saver).
         // `custom` is the menu's own (user, 2026-10-06): each setting a
-        // slider over its `choices`, starting from `high`. lights: how
-        // many moving lights without shadows are lit at once (the nearest:
-        // a burning thicket, a doorway's glow, someone else's torch).
+        // slider over its `choices`, starting from `high`. The moving
+        // lights without shadows (a burning thicket, a doorway's glow,
+        // someone else's torch, a standing torch) have no limit: every one
+        // that can fall on the picture is lit (user, 2026-10-09; it was
+        // the nearest 4).
         // shadowExtent is the half-width in blocks of the shadowed area
         // around the middle of the ground on screen. lamp: the torches that stand in a map (on a
         // stand or a wall; user, 2026-10-06), each one of the moving lights:
@@ -507,7 +514,6 @@ const gameConfig = (() => {
                 bounce: [false, true],
                 lampShadows: [0, 1, 2, 3, 4]
             },
-            lights: 4,
             shadowExtent: 15,
             lamp: { light: 0.5, reach: 6, decay: 1.3, glow: 6, shadow: { taps: 4, fade: 0.3, keep: 0.5, margin: 1, still: 0.3, refresh: 1 } },
 
