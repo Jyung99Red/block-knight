@@ -15,13 +15,13 @@ const tuneApp = (() => {
         ['躯干', [['base', '整个人'], ['pelvis', '骨盆'], ['chest', '胸'], ['head', '头']]],
         ['右臂（拿武器）', [['upperArmR', '大臂'], ['forearmR', '小臂'], ['handR', '手腕']]],
         ['左臂（拿盾）', [['upperArmL', '大臂'], ['forearmL', '小臂'], ['handL', '手腕']]],
-        ['右腿', [['thighR', '大腿'], ['shinR', '小腿']]],
-        ['左腿', [['thighL', '大腿'], ['shinL', '小腿']]]
+        ['右腿', [['thighR', '大腿'], ['shinR', '小腿'], ['footR', '脚']]],
+        ['左腿', [['thighL', '大腿'], ['shinL', '小腿'], ['footL', '脚']]]
     ];
     const BONE_NAMES = Object.fromEntries(BONE_GROUPS.flatMap(([group, bones]) => bones.map(([id, name]) => [id, `${group.replace(/（.*）/, '')}·${name}`])));
     const HINTS = {
         base: 'ry 整个人转向（正数转向左边）；rx 负数往后倒。py 上下没有效果：人总会自动落到地上',
-        pelvis: 'ry 扭胯。py 上下没有效果（人总会自动落到地上）；要蹲低就弯腿：大腿 rx 负、小腿 rx 正',
+        pelvis: 'ry 扭胯。出招时 py 是胯的高低（负数往下蹲，脚不动、膝盖弯）；其他姿势里 py 没有效果（人总会自动落到地上），要蹲低就弯腿：大腿 rx 负、小腿 rx 正',
         chest: 'rx 正数往前弯腰，负数后仰；ry 正数转向左边',
         head: 'rx 负数抬头后仰',
         upperArmR: 'rx 负数往前抬（-1.57 平举，-3.1 举过头顶）；ry 正数往身体左边摆；rz 负数往右侧张开',
@@ -33,10 +33,12 @@ const tuneApp = (() => {
         thighR: 'rx 负数往前抬腿，正数往后',
         shinR: 'rx 正数弯膝',
         thighL: 'rx 负数往前抬腿，正数往后',
-        shinL: 'rx 正数弯膝'
+        shinL: 'rx 正数弯膝',
+        footR: '出招的腿由程序摆，这里写脚踩在哪：pz 往前（负数往后），px 往左（负数往右），py 离地多高；rx 正数脚尖朝下、负数脚尖翘起，ry 正数脚尖往左转。一个姿势不写这只脚，它就停在原地不动',
+        footL: '出招的腿由程序摆，这里写脚踩在哪：pz 往前（负数往后），px 往左（负数往右），py 离地多高；rx 正数脚尖朝下、负数脚尖翘起，ry 正数脚尖往左转。一个姿势不写这只脚，它就停在原地不动'
     };
-    const MOVED = new Set(['base', 'pelvis']);
-    const channelsOf = bone => MOVED.has(bone) ? ['rx', 'ry', 'rz', 'px', 'py', 'pz'] : ['rx', 'ry', 'rz'];
+    const MOVED = new Set(['base', 'pelvis']), FEET = new Set(['footR', 'footL']), LEGS = new Set(['thighR', 'shinR', 'thighL', 'shinL']);
+    const channelsOf = bone => FEET.has(bone) ? ['pz', 'px', 'py', 'rx', 'ry'] : MOVED.has(bone) ? ['rx', 'ry', 'rz', 'px', 'py', 'pz'] : ['rx', 'ry', 'rz'];
     const RANGES = { r: [-moveLab.ANGLE_LIMIT, moveLab.ANGLE_LIMIT, 0.01], p: [-0.6, 0.6, 0.01] };
     // A bone's own axes, in the view's colours.
     const OWN_AXES = [['x', '红'], ['y', '绿'], ['z', '蓝']];
@@ -394,7 +396,7 @@ const tuneApp = (() => {
                         <button type="button" data-zero title="归零">0</button>
                         <button type="button" class="ch-was" data-was hidden></button>
                     </div>`; }).join('')}
-                    <div class="turn">
+                    <div class="turn"${FEET.has(id) ? ' hidden' : ''}>
                         <span class="turn-label">绕自身轴</span>
                         ${OWN_AXES.map(([a, colour]) => `<button type="button" class="ch-r${a}" data-turn="${a}" title="按住左右拖：绕这根骨头自己的 ${a} 轴（画面上的${colour}线）转，三个数会一起变；Shift 更细">${a.toUpperCase()} ⟲</button>`).join('')}
                         <span class="turn-note">按住左右拖</span>
@@ -412,6 +414,9 @@ const tuneApp = (() => {
                 const p = pose[bone] || {}, w = was[bone] || {};
                 row.classList.toggle('picked', bone === state.bone);
                 row.classList.toggle('set', Object.values(p).some(v => v));
+                // A move's legs are its feet (the program bends them); the
+                // other poses' are the thighs and shins.
+                row.hidden = state.mode === 'pose' ? FEET.has(bone) : LEGS.has(bone);
                 row.querySelector('.bone-body').hidden = !state.open.has(bone);
                 row.classList.toggle('open', state.open.has(bone));
                 row.querySelector('[data-sum]').textContent = Object.keys(p).filter(c => p[c]).map(c => `${c} ${+fixed(p[c])}`).join(' · ');

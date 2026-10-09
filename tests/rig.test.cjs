@@ -14,9 +14,9 @@ const lowestBody = solved => R.lowest(rig, solved);
 // Objects made inside the vm have their own prototypes; compare as data.
 const plain = value => JSON.parse(JSON.stringify(value));
 
-test('the main character has the 14 bones of design.md 2.1', () => {
+test('the main character has the 16 bones of design.md 2.1', () => {
     const names = rig.bones.map(b => b.name);
-    assert.deepEqual(plain(names.sort()), ['base', 'chest', 'forearmL', 'forearmR', 'handL', 'handR', 'head', 'pelvis', 'shinL', 'shinR', 'thighL', 'thighR', 'upperArmL', 'upperArmR'].sort());
+    assert.deepEqual(plain(names.sort()), ['base', 'chest', 'forearmL', 'forearmR', 'handL', 'handR', 'head', 'pelvis', 'shinL', 'shinR', 'thighL', 'thighR', 'footL', 'footR', 'upperArmL', 'upperArmR'].sort());
     const parent = name => { const b = rig.bones[rig.index[name]]; return b.parent < 0 ? null : rig.bones[b.parent].name; };
     assert.equal(parent('base'), null);
     assert.equal(parent('pelvis'), 'base');
@@ -28,6 +28,7 @@ test('the main character has the 14 bones of design.md 2.1', () => {
         assert.equal(parent(`hand${s}`), `forearm${s}`);
         assert.equal(parent(`thigh${s}`), 'pelvis');
         assert.equal(parent(`shin${s}`), `thigh${s}`);
+        assert.equal(parent(`foot${s}`), `shin${s}`);
     }
     // Mount points are points on bones, not bones.
     for (const mount of ['handR', 'handL', 'back', 'waist', 'head']) assert.ok(playerModel.mounts[mount]);
@@ -124,7 +125,7 @@ test('walking and running are pure functions of gait phase and blends, feet on t
 
 test('the stride matches the leg swing: the planted foot stays put, walking or running', () => {
     const P = gameConfig.player, unit = gameConfig.world.unitsPerBlock;
-    const foot = find(p => p.tag === 'foot' && rig.bones[p.bone].name === 'shinR');
+    const foot = find(p => p.tag === 'foot' && rig.bones[p.bone].name === 'footR');
     // The legs are timed so the planted foot keeps pace while the body goes
     // on evenly; walking takes unhurried steps, running is a jog with fewer
     // steps than before, a hop between strides (user, 2026-10-02). Running,
@@ -156,7 +157,7 @@ test('walking while charging moves the legs under the held charge', () => {
 });
 
 test('under a guard the knees bend (user, 2026-10-05: a squat, the feet side by side; it was the left foot ahead): standing, both feet down and a little apart, a little lower; walking, still bent, the planted foot still put', () => {
-    const unit = gameConfig.world.unitsPerBlock, feet = ['R', 'L'].map(s => find(p => p.tag === 'foot' && rig.bones[p.bone].name === `shin${s}`));
+    const unit = gameConfig.world.unitsPerBlock, feet = ['R', 'L'].map(s => find(p => p.tag === 'foot' && rig.bones[p.bone].name === `foot${s}`));
     const pelvisAt = s => s.bones[rig.index.pelvis][13], low = (s, i) => Math.min(...cornersOf(s, i).map(c => c[1]));
     for (const offhand of [gameConfig.gear.starter.offhand, null]) {
         const loadout = { ...gameConfig.gear.starter, offhand }, body = guardBlend => ({ gait: 0, moveBlend: 0, runBlend: 0, guardBlend, stun: 0, loadout });

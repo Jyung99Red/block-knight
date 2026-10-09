@@ -1,4 +1,4 @@
-// The main character (design.md 2.1): 14 bones, blocks as the
+// The main character (design.md 2.1): 16 bones, blocks as the
 // unit, about 1.9 blocks tall. The model faces +z; its right side is -x.
 // Mount points carry equipment and are not bones.
 const playerModel = (() => {
@@ -39,12 +39,15 @@ const playerModel = (() => {
     for (const [side, sx] of [['R', -1], ['L', 1]]) {
         bones.push(
             { name: `thigh${side}`, parent: 'pelvis', at: [0.14 * sx, 0, 0] },
-            { name: `shin${side}`, parent: `thigh${side}`, at: [0, -0.36, 0] }
+            { name: `shin${side}`, parent: `thigh${side}`, at: [0, -0.36, 0] },
+            // The ankle, in the middle of the boot: a foot can stay flat,
+            // or stand on its toe or heel, whatever the leg does.
+            { name: `foot${side}`, parent: `shin${side}`, at: [0, -0.29, 0] }
         );
         parts.push(
             { bone: `thigh${side}`, size: [0.26, 0.38, 0.28], at: [0, -0.18, 0], color: 'pants' },
             { bone: `shin${side}`, size: [0.25, 0.24, 0.27], at: [0, -0.11, 0], color: 'pants' },
-            { bone: `shin${side}`, size: [0.28, 0.14, 0.34], at: [0, -0.29, 0.03], color: 'boots', tag: 'foot' }
+            { bone: `foot${side}`, size: [0.28, 0.14, 0.34], at: [0, 0, 0.03], color: 'boots', tag: 'foot' }
         );
     }
     return Object.freeze({
@@ -66,7 +69,7 @@ const playerModel = (() => {
         // Animation layers (design.md 2.4): legs walk while
         // the upper body holds a shield or attacks.
         layers: {
-            lower: ['base', 'pelvis', 'thighR', 'shinR', 'thighL', 'shinL'],
+            lower: ['base', 'pelvis', 'thighR', 'shinR', 'footR', 'thighL', 'shinL', 'footL'],
             upper: ['chest', 'head', 'upperArmR', 'forearmR', 'handR', 'upperArmL', 'forearmL', 'handL']
         }
     });
