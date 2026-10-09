@@ -162,10 +162,11 @@ const playerAnim = (() => {
         }));
         return legRigs.get(rig);
     }
-    // A foot: { x, z, y, rx, ry }, y the boot's lowest point off the ground.
+    // A foot: { x, z, y, rx, ry, arc }, y the boot's lowest point off the
+    // ground, arc how much of that is a step's lift.
     function footAt(rig, solved, l) {
         const m = solved.bones[rig.index[l.names[2]]];
-        return { x: m[12], z: m[14], y: m[13] + l.under(Math.asin(-m[9])), rx: Math.asin(-m[9]), ry: Math.atan2(m[8], m[10]) };
+        return { x: m[12], z: m[14], y: m[13] + l.under(Math.asin(-m[9])), rx: Math.asin(-m[9]), ry: Math.atan2(m[8], m[10]), arc: 0 };
     }
     // The rest's feet, and how high it stands (its base), as it is drawn
     // standing. Kept per rig and pose, but worked out anew on the move
@@ -183,30 +184,30 @@ const playerAnim = (() => {
     // Where a key puts the feet, the one it leaves out where it was (`held`).
     const placed = (rig, key, held) => legsOf(rig).map((l, i) => {
         const f = key[l.names[2]], k = rig.scale;
-        return f ? { x: l.hip[0] + (f.px || 0) * k, z: (f.pz || 0) * k, y: (f.py || 0) * k, rx: f.rx || 0, ry: f.ry || 0 } : held[i];
+        return f ? { x: l.hip[0] + (f.px || 0) * k, z: (f.pz || 0) * k, y: (f.py || 0) * k, rx: f.rx || 0, ry: f.ry || 0, arc: 0 } : held[i];
     });
     // From feet `from` to `to` over s (0..1), each lifted on an arc as high
-    // as its step is long allows (`raised` false: not lifted, where it
-    // would be set down). Standing, one foot at a time (the one going
+    // as its step is long allows. Standing, one foot at a time (the one going
     // forward first, each taking the time its step is long, easing in and
     // out). `ahead`: how far the body itself goes meanwhile (s eased as it
     // goes), the feet going with it together; one that stays in the world
     // goes as far back in the body's frame, unlifted.
-    function stepTo(from, to, s, ahead = 0, raised = true) {
+    function stepTo(from, to, s, ahead = 0) {
         const F = playerPoses.feet, far = from.map((f, i) => Math.hypot(to[i].x - f.x, to[i].z + ahead - f.z));
         const first = to[0].z - from[0].z >= to[1].z - from[1].z ? 0 : 1, split = ahead ? 1 : far[first] / (far[0] + far[1] || 1);
         return from.map((f, i) => {
             const t = to[i], k = ahead ? s : smooth(clamp01(i === first ? s / (split || 1) : (s - split) / (1 - split || 1)));
             // A foot still in the air from the step before comes down meanwhile.
             const go = (a, b) => a + (b - a) * k, was = f.arc || 0;
-            const arc = was * (1 - smooth(clamp01(2 * s))) + (raised ? Math.min(F.lift, F.liftPerBlock * far[i]) * Math.sin(Math.PI * k) : 0);
+            const arc = was * (1 - smooth(clamp01(2 * s))) + Math.min(F.lift, F.liftPerBlock * far[i]) * Math.sin(Math.PI * k);
             return { x: go(f.x, t.x), z: go(f.z, t.z + ahead) - ahead * s, y: go(f.y - was, t.y) + arc, rx: go(f.rx, t.rx), ry: go(f.ry, t.ry), arc };
         });
     }
     // Where a move's swing leaves the feet, from where it found them: where
     // its keys put them, a foot they leave out where it was (through the
     // swing's step `ahead`, on the ground where it stood, so the body
-    // leaves it that much further behind).
+    // leaves it that much further behind). Only for a move cut short
+    // without its feet kept (feetOf).
     function swungTo(rig, id, found, ahead) {
         const K = playerMoves.moves[id];
         return placed(rig, K.b, placed(rig, K.a, found).map(f => ({ ...f, z: f.z - ahead })));
@@ -214,19 +215,21 @@ const playerAnim = (() => {
     const aheadOf = (rig, step) => step / gameConfig.world.unitsPerBlock * rig.scale;
     // A move's recovery, from where its swing left the feet back to the
     // rest: they keep the cut's stance up to the derive point (the next move
-    // of a combo takes them as they are), then step back. For a move cut
-    // short, where its swing left them is worked out from the rest.
-    function recoverFeet(rig, id, t, rest, swung, raised) {
-        const m = gameConfig.combo.moves[id], start = m.derive || 0, home = standOf(rig, rest).feet;
-        return stepTo(swung || swungTo(rig, id, home, aheadOf(rig, m.step)), home, clamp01((t - start) / Math.max(1e-9, m.recovery - start)), 0, raised);
+    // of a combo takes them as they are), then step back.
+    function recoverFeet(rig, id, t, rest, swung) {
+        const m = gameConfig.combo.moves[id], start = m.derive || 0;
+        return stepTo(swung, standOf(rig, rest).feet, clamp01((t - start) / Math.max(1e-9, m.recovery - start)));
     }
     // The feet at a moment of the move `act`, in the body's frame as it is
     // then (the swing's step taken so far is behind it).
     function feetOf(rig, act, rest) {
-        const m = gameConfig.combo.moves[act.move], K = playerMoves.moves[act.move], from = act.from;
-        // Where the move found them: at rest, or in the recovery it cut short.
-        const found = from ? recoverFeet(rig, from.move, from.t, rest) : standOf(rig, rest).feet;
-        const a = placed(rig, K.a, from ? recoverFeet(rig, from.move, from.t, rest, null, false) : found);
+        const m = gameConfig.combo.moves[act.move], K = playerMoves.moves[act.move], from = act.from, home = standOf(rig, rest).feet;
+        // Where the move found them: at rest, or as the move it cut short
+        // had them (`from.feet`, kept as it began: core/fighter.js; without
+        // it, as that move would have them out of the rest). A foot still
+        // in the air there is set down where a key leaves it out.
+        const found = !from ? home : from.feet || recoverFeet(rig, from.move, from.t, rest, swungTo(rig, from.move, home, aheadOf(rig, gameConfig.combo.moves[from.move].step)));
+        const a = placed(rig, K.a, found.map(f => ({ ...f, y: f.y - f.arc, arc: 0 })));
         if (act.phase === 'windup') {
             const lead = act.lead || 0;
             return stepTo(found, a, clamp01(m.windup > lead ? (act.t - lead) / (m.windup - lead) : 1));
@@ -368,5 +371,8 @@ const playerAnim = (() => {
             upperArmR: { rz: -B.arms * s, ry: shake }, upperArmL: { rz: B.arms * s }
         });
     }
-    return { pose, present, movePose, cycleLength, loop, gaitOf };
+    // Where a fighter's feet are in the move under way (null out of one):
+    // the next move of a combo keeps it as where it found them.
+    const feetNow = (rig, body) => body.act ? feetOf(rig, body.act, restOf(body.loadout)) : null;
+    return { pose, present, movePose, cycleLength, loop, gaitOf, feetNow };
 })();

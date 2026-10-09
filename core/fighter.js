@@ -16,7 +16,9 @@
 //   act    the move under way: { move, phase: windup|charge|swing|recover,
 //          t (seconds into the phase), lead (windup already behind it when
 //          it started: the time the key took to tell A from B), facing,
-//          pressAt, share, stepTotal, hit: [ids], from: { move, t } | null }
+//          pressAt, share, stepTotal, hit: [ids], from: { move, t, feet } |
+//          null: the move whose recovery it cut short, and where the feet
+//          were then (core/player_anim.js) }
 //   chain  the last finished swing, while its combo window is open:
 //          { move, at (time the swing ended), cued }
 //   buffer one input pressed ahead: { input: 'a' | 'b', at, age } (age
@@ -112,7 +114,7 @@ const fighterKit = (() => {
         const d = derive(p, input, at), prev = p.act;
         p.act = {
             move: d.id, phase: 'windup', t: lead, lead, facing: p.facing, pressAt: at, share: 0, stepTotal: moveOf(d.id).step, hit: [],
-            from: prev && prev.phase === 'recover' ? { move: prev.move, t: prev.t } : null
+            from: prev && prev.phase === 'recover' ? { move: prev.move, t: prev.t, feet: playerAnim.feetNow(rigOf(sim, p), p) } : null
         };
         p.combo = d.derived ? [...p.combo, ...(d.paused ? ['-'] : []), input] : [input];
         p.chain = null; p.buffer = null;

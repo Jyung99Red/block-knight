@@ -26,7 +26,7 @@ const playerMoves = (() => {
         },
         // Back up the same diagonal: low left to the right, at the shoulder.
         backslash: {
-            a: key({ pelvis: { py: 0.01 }, chest: { ry: 0.3, rx: 0.12 }, upperArmR: { rx: -0.85, ry: 0.6, rz: 0.1 }, forearmR: { rz: 0.3 }, handR: { rx: 1.2 }, footR: { pz: 0.15 }, footL: { pz: -0.1 } }),
+            a: key({ pelvis: { py: 0.01 }, chest: { ry: 0.3, rx: 0.12 }, upperArmR: { rx: -0.85, ry: 0.6, rz: 0.1 }, forearmR: { rz: 0.3 }, handR: { rx: 1.2 } }),
             b: key({ chest: { ry: -0.3, rx: -0.05 }, upperArmR: { rx: -1.5, rz: -0.3, ry: -0.65 }, handR: { rx: 1.3 } })
         },
         // The finisher, with weight: the upper arm level, out front to the right,

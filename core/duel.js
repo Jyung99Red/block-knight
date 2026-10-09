@@ -103,7 +103,8 @@ const duelKit = (() => {
         if (a === null) return true;
         return obj(a) && ownMove(a.move) && ['windup', 'charge', 'swing', 'recover'].includes(a.phase) && within(a.t, 0, 60) && within(a.lead, 0, 1) && num(a.facing) &&
             num(a.pressAt) && within(a.share, 0, 1) && num(a.stepTotal) && Array.isArray(a.hit) && a.hit.length <= 8 && a.hit.every(h => typeof h === 'string') &&
-            (a.from === null || (obj(a.from) && ownMove(a.from.move) && num(a.from.t)));
+            (a.from === null || (obj(a.from) && ownMove(a.from.move) && num(a.from.t) && Array.isArray(a.from.feet) && a.from.feet.length === 2 &&
+                a.from.feet.every(f => obj(f) && ['x', 'z', 'y', 'rx', 'ry', 'arc'].every(k => num(f[k])))));
     }
     function validSnapshot(sim, s) {
         if (!obj(s) || !num(s.time) || s.time < 0 || !count(s.tick) || s.map !== sim.map || s.region !== sim.region || s.duel !== true || !count(s.seed) || !count(s.serial)) return false;
