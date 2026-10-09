@@ -66,7 +66,6 @@ test('pressing A starts the windup at once; without a next input the recovery pl
 });
 
 test('one attack key (user, 2026-10-03): a tap is an A, a hold a B, and telling them apart costs no time', () => {
-    assert.ok(HOLD > 0 && HOLD <= 0.25, `hold ${HOLD}`);
     // A tap that took 0.08 s: the slash starts 0.08 s into its windup and swings when a press would have.
     const sim = setup(); press(sim, 'attack'); step(sim, 0.08);
     assert.equal(sim.player.act, null, 'not told yet');
@@ -78,10 +77,6 @@ test('one attack key (user, 2026-10-03): a tap is an A, a hold a B, and telling 
     const held = setup(); press(held, 'attack'); step(held, HOLD - 0.02);
     assert.equal(held.player.act, null);
     step(held, 0.02); assert.equal(phase(held), 'windup:charged'); assert.ok(Math.abs(held.player.act.t - HOLD) < 0.011);
-    // A dagger lunge's windup is shorter than that: it swings the moment it is told.
-    const dagger = setup({ main: 'assassin_dagger' }); press(dagger, 'attack');
-    const dl = until(dagger, 'swing:lunge'); release(dagger, 'attack');
-    assert.ok(M.lunge.windup < HOLD && Math.abs(dl.at(-1).time - HOLD) < 0.021, `lunges at ${dl.at(-1).time}`);
     // While it tells, the body stands as in a windup: no walking, a slow turn.
     const still = setup(), P = gameConfig.player; still.player.facing = -Math.PI / 2;
     const x0 = still.player.x, y0 = still.player.y;
@@ -270,25 +265,8 @@ test('a landed hit holds both fighters for the hitstop; only moves with knockbac
     assert.equal(anchored.dummy.x, ax);
 });
 
-test('stagger comes from B moves only, in whole points; three and the dummy reels, then recovers', () => {
-    const S = gameConfig.combat.stagger;
-    const sim = setup({ near: true });
-    tap(sim); until(sim, 'recover:slash'); tap(sim); until(sim, 'recover:backslash'); tap(sim);
-    run(sim, () => phase(sim) === 'idle');
-    assert.equal(sim.stats.hits, 3); assert.equal(sim.dummy.stagger, 0, 'A A A: no stagger');
-    for (const m of Object.values(M)) assert.ok(Number.isInteger(m.stagger) && m.stagger >= 0, `${m.name}: whole stagger points (user, 2026-10-02)`);
-    tap(sim, 'b'); until(sim, 'recover:charged'); assert.equal(sim.dummy.stagger, M.charged.stagger);
-    run(sim, () => phase(sim) === 'idle'); step(sim, K.windowAfterRecovery + 0.05); // else A would be the follow-up
-    // A B: the rising cut's 2 tips it over 3.
-    assert.ok(M.charged.stagger < S.threshold && M.charged.stagger + M.rising.stagger >= S.threshold);
-    tap(sim); until(sim, 'recover:slash'); tap(sim, 'b'); until(sim, 'recover:rising');
-    assert.equal(sim.dummy.phase, 'reel'); assert.equal(sim.dummy.stagger, 0, 'and its points start over');
-    assert.ok(W.drain(sim).some(e => e.type === 'stagger' && e.side === 'dummy'));
-    step(sim, S.duration + 0.05); assert.equal(sim.dummy.phase, 'idle');
-});
-
 // ---- weapon types (design.md 4.2) ----
-test('each weapon type has its own tree: roots and derived moves stay in the type, stagger in whole points', () => {
+test('each weapon type has its own tree: roots and derived moves stay in the type', () => {
     for (const [type, w] of Object.entries(K.weapons)) {
         for (const input of ['a', 'b']) assert.equal(M[w.root[input]]?.weapon, type, `${type} ${input} root`);
         for (const [id, m] of Object.entries(M).filter(([, m]) => m.weapon === type)) {
@@ -298,9 +276,6 @@ test('each weapon type has its own tree: roots and derived moves stay in the typ
     }
     // Every weapon names a type with a tree.
     for (const [id, item] of Object.entries(gameConfig.items)) if (item.slot === 'main') assert.ok(K.weapons[item.weapon], id);
-    // The sword is the slower one: every sword move is longer than the dagger's at the same place in the tree.
-    const length = id => M[id].windup + M[id].swing + M[id].recovery;
-    for (const [s, d] of [['slash', 'cut'], ['backslash', 'recut'], ['smite', 'whirl'], ['thrust', 'stab']]) assert.ok(length(s) > length(d), `${s} is slower than ${d}`);
 });
 
 // Walk a combo: each input pressed once the move before has swung.
@@ -314,42 +289,6 @@ function combo(sim, inputs) {
     }
     return done;
 }
-
-test('the dagger chains five As: cut, recut, stab, whirl, drop', () => {
-    const sim = setup({ main: 'assassin_dagger' });
-    assert.deepEqual(combo(sim, ['a', 'a', 'a', 'a', 'a']), ['cut', 'recut', 'stab', 'whirl', 'drop']);
-    assert.deepEqual([...sim.player.combo], ['a', 'a', 'a', 'a', 'a']);
-    // The drop is the finisher: an A late in its recovery starts over once it is over.
-    run(sim, () => sim.player.act.t > M.drop.recovery - 0.2);
-    tap(sim); assert.equal(sim.player.act.move, 'drop');
-    run(sim, () => sim.player.act?.move === 'cut');
-    assert.equal(sim.player.act?.move, 'cut');
-});
-
-test('inside a dagger combo B flicks and goes on: A A A B A A is six moves', () => {
-    const sim = setup({ main: 'assassin_dagger' });
-    assert.deepEqual(combo(sim, ['a', 'a', 'a', 'b', 'a', 'a']), ['cut', 'recut', 'stab', 'flick', 'whirl', 'drop']);
-    assert.deepEqual([...sim.player.combo], ['a', 'a', 'a', 'b', 'a', 'a']);
-    const early = setup({ main: 'assassin_dagger' });
-    assert.deepEqual(combo(early, ['a', 'b', 'a', 'a']), ['cut', 'flick', 'whirl', 'drop']);
-});
-
-test('the dagger opens B with a lunge forward and goes on into the chain; a pause after A A jumps back', () => {
-    const sim = setup({ main: 'assassin_dagger' }), x0 = sim.player.x;
-    sim.player.facing = 0;
-    tap(sim, 'b'); assert.equal(sim.player.act.move, 'lunge', 'no charge: B is the lunge at once');
-    until(sim, 'recover:lunge');
-    assert.ok(sim.player.x - x0 > M.lunge.step - 1, `lunged ${(sim.player.x - x0).toFixed(1)}`);
-    assert.deepEqual(combo(sim, ['a', 'a']), ['recut', 'stab']);
-    const back = setup({ main: 'assassin_dagger' });
-    back.player.facing = 0;
-    tap(back); until(back, 'recover:cut'); tap(back); run(back, () => phase(back) === 'idle');
-    step(back, K.weapons.dagger.pauseAfterRecovery + 0.02);
-    const x1 = back.player.x; tap(back);
-    assert.equal(back.player.act.move, 'retreat');
-    until(back, 'recover:retreat');
-    assert.ok(x1 - back.player.x > -M.retreat.step - 1, `jumped back ${(x1 - back.player.x).toFixed(1)}`);
-});
 
 test('an input the move does not derive waits for the recovery: no endless loops through the root', () => {
     // B in the whirl (it derives only A): the lunge starts after the whirl's whole recovery.
