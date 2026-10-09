@@ -78,6 +78,12 @@ const renderEffects = (() => {
         }
 
         // ---- stagger stars, one ring per reeling foe ----
+        // (One of no size is drawn in the world's first frame and hidden
+        // after, `warm`: render/world_view.js. The stars' shader -- a
+        // parry's white flash is drawn by it too -- is made then, not in
+        // the middle of a fight, and stays.)
+        const warm = new T.Mesh(unit, new T.MeshBasicMaterial({ color: '#ffd84a' }));
+        warm.scale.setScalar(0); warm.frustumCulled = false; scene.add(warm);
         const starRings = new Map();
         function starsFor(id) {
             if (!starRings.has(id)) {
@@ -199,7 +205,7 @@ const renderEffects = (() => {
         }
         // Camera jitter for this frame, in blocks.
         const jitter = () => shake > 0 ? [(rnd() - 0.5) * shake * 0.4, (rnd() - 0.5) * shake * 0.4] : [0, 0];
-        return { onEvents, update, jitter };
+        return { onEvents, update, jitter, warm };
     }
     return { create };
 })();

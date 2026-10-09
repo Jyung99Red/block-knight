@@ -58,7 +58,9 @@ const worldView = (() => {
         // hourShift: hours the time of day is drawn ahead, from ?hour=21
         // in the address (it starts at that hour and goes on; for testing,
         // never saved).
-        const tune = { zoom: 1, sunMap: 0, torchMap: 0, built: null, hourShift: 0, distance: C.camera.distance };
+        // gives: the most things that give light any world so far has had
+        // (render/view_light.js: every world is given as many lights).
+        const tune = { zoom: 1, sunMap: 0, torchMap: 0, built: null, hourShift: 0, distance: C.camera.distance, gives: 0 };
         // `level`: a quality's name (graphics.quality) or its values.
         // Returns whether the shaders must be built anew.
         function quality(level) {
@@ -77,9 +79,19 @@ const worldView = (() => {
         if (asked !== null && Number.isFinite(Number(asked))) tune.hourShift = Number(asked) - dayKit.hourOf(sim);
 
         // The world now and whose it is, to build again when the shaders change.
-        let shown = null;
-        function load(next, { selfId = 'player' } = {}) {
-            if (world) world.dispose();
+        // The world before it (`stale`) stays till this one has been
+        // drawn once: the shaders are the engine's for as long as a
+        // material uses them, and every world's are the same ones (the
+        // same lights in each: render/view_light.js), so the new world
+        // takes them over, where it had them made anew, a second or more
+        // on the first visit to a region (user, 2026-10-09). `anew`: the
+        // shaders are others now (the picture quality's), and the world
+        // before goes first.
+        let shown = null, stale = null;
+        function load(next, { selfId = 'player', anew = false } = {}) {
+            if (stale) stale.dispose();
+            stale = world;
+            if (anew && stale) { stale.dispose(); stale = null; }
             shown = { sim: next, selfId };
             world = build(T, renderer, next, camera, selfId, tune);
         }
@@ -114,6 +126,8 @@ const worldView = (() => {
             tour.fade = shot ? shot.fade : 0;
             world.render(current, frameSeconds, bodies, events, shot, yaw, pitch);
             renderer.render(world.scene, camera);
+            world.drawn();
+            if (stale) { stale.dispose(); stale = null; }
         }
         function resize(width, height) {
             if (!width || !height) return;
@@ -126,7 +140,7 @@ const worldView = (() => {
         // materials go, and their programs with them).
         function settings({ zoom, quality: level }) {
             tune.zoom = zoom;
-            if (quality(level)) load(shown.sim, { selfId: shown.selfId });
+            if (quality(level)) load(shown.sim, { selfId: shown.selfId, anew: true });
             else world.retune();
         }
         // A point in blocks to CSS pixels on the canvas, or null behind the camera.
@@ -432,7 +446,7 @@ const worldView = (() => {
                 props.warn(entry, m, visible);
             }
             props.update(current, focus, clock);
-            ground.update();
+            ground.update([focus[0], focus[2]]);
             effects.onEvents(events, selfId);
             effects.update(frameSeconds, current, { selfId, fighters: drawn, foes });
             sight.update(at[0], at[2], me.facing, seeing);
@@ -482,8 +496,24 @@ const worldView = (() => {
             light.dispose();
         }
         light.retune();
+        // A world's first frame draws all there is, in sight or not, and
+        // a few things of no size that are drawn only later in play
+        // (`warm`: a monster's warning, a star): every shader the world
+        // can need is made in that frame and every mesh sent to the
+        // graphics card, at the moment the region is entered, where it
+        // was as each first came up -- the first loot, the first blow, a
+        // pond coming into sight (user, 2026-10-09). `drawn`: the frame
+        // is drawn; from then on what is out of sight is left out again.
+        const warm = [props.warm, effects.warm], whole = [];
+        scene.traverse(o => { if (o.isMesh && o.frustumCulled) { o.frustumCulled = false; whole.push(o); } });
+        function drawn() {
+            if (!whole.length && !warm[0].visible) return;
+            for (const o of whole) o.frustumCulled = true;
+            whole.length = 0;
+            for (const o of warm) o.visible = false;
+        }
         const tourFocus = () => pick.thing ? { id: pick.thing.id, look: lookOf(pick.thing) } : null;
-        return { scene, render, dispose, retune: light.retune, playerRig, seen, ground, tourFocus };
+        return { scene, render, drawn, dispose, retune: light.retune, playerRig, seen, ground, tourFocus };
     }
     return { create };
 })();

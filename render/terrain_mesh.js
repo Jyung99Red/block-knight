@@ -648,9 +648,22 @@ if (${leaves ? 'false' : 'true'} && cutOn > 0.5 && cutOpen > 0.01 && vCutPos.y >
         function drop({ mesh: m, water: w, leaves: l }) {
             for (const one of [m, w, l]) if (one) { scene.remove(one); one.geometry.dispose(); }
         }
-        // Rebuild every chunk whose revision moved (all of them the first time).
-        function update() {
+        // Rebuild the chunks whose revision moved (all of them the first
+        // time), and work the light out again where the terrain has
+        // changed. `near`: where the picture looks ([x, z], blocks). With
+        // it, a change is worked through over a few frames, so that none
+        // of them is long (user, 2026-10-09: gathering stalled the
+        // picture): at once the sky round the change and the chunks whose
+        // own cells have changed; then the chunks that only stand by it
+        // (what they draw of it is the shade in their corners), one a
+        // frame, the nearest first; then the probes (`owed`: those still
+        // to look round again). Without it, all of it at once.
+        let owed = null;
+        const otherwise = (was, now) => { for (let i = 0; i < now.length; i++) if (was[i] !== now[i]) return true; return false; };
+        function update(near = null) {
             if (decoRev !== t.rev) {
+                // (Probes owed from the change before look round the grid as that change left it.)
+                if (owed) { bake(owed.changed); owed = null; }
                 deco = decor(sim); fronts = facades(); decoRev = t.rev;
                 // (The crowns hide nothing from the cut: they fade by themselves.)
                 decoKeys = new Set(); top = 0;
@@ -669,21 +682,30 @@ if (${leaves ? 'false' : 'true'} && cutOn > 0.5 && cutOpen > 0.01 && vCutPos.y >
                 skyAt = terrainLight.sky(next, changed && { from: skyAt, changed: changed.filter(cell => cell[3]) });
                 if (changed) under.forEach((name, i) => { if (name !== grounds[i]) changed.push([i % t.width, -1, Math.floor(i / t.width), false]); });
                 blocks = next; grounds = under;
-                if (probes && !(baked && changed && !changed.length)) bake(changed);
+                if (probes && !(baked && changed && !changed.length)) owed = { changed };
             }
-            let rebuilt = 0;
+            const paced = !!near && chunks.size > 0, now = [], later = [];
             t.chunks.forEach((chunk, i) => {
                 const have = chunks.get(i);
                 if (have && have.rev === chunk.rev) return;
+                (!paced || !have || otherwise(have.kind, chunk.kind) || otherwise(have.level, chunk.level) ? now : later).push(i);
+            });
+            if (!now.length && later.length) {
+                // How far the picture's middle is from chunk `i`, blocks.
+                const far = i => { const { c0, r0, c1, r1 } = terrainKit.chunkCells(t, i); return Math.hypot(near[0] - Math.min(c1, Math.max(c0, near[0])), near[1] - Math.min(r1, Math.max(r0, near[1]))); };
+                now.push(later.sort((a, b) => far(a) - far(b)).shift());
+            }
+            for (const i of now) {
+                const have = chunks.get(i), chunk = t.chunks[i];
                 if (have) drop(have);
                 const { b, wet, leaf } = build(i), m = mesh(b, material), w = wet.pos.length ? mesh(wet, wetMaterial) : null, l = leaf.pos.length ? mesh(leaf, leafMaterial) : null;
                 scene.add(m);
                 if (w) scene.add(w);
                 if (l) scene.add(l);
-                chunks.set(i, { rev: chunk.rev, mesh: m, water: w, leaves: l });
-                rebuilt++;
-            });
-            return rebuilt;
+                chunks.set(i, { rev: chunk.rev, kind: chunk.kind.slice(), level: chunk.level.slice(), mesh: m, water: w, leaves: l });
+            }
+            if (owed && !(paced && now.length)) { bake(owed.changed); owed = null; }
+            return now.length;
         }
         update();
         return {

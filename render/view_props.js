@@ -26,10 +26,15 @@ const viewProps = (() => {
         for (const e of sim.entities) if (e.type === 'grave') graves.set(e.id, character(graveRig));
         const unitBox = new T.BoxGeometry(1, 1, 1), DROPS = 64, drops = new T.InstancedMesh(unitBox, new T.MeshLambertMaterial({ map: tx.grain }), DROPS);
         drops.castShadow = true; drops.frustumCulled = false; drops.count = 0;
+        // (Its colours are there from the start, and the flames' below: a
+        // mesh whose instances get colours only later is drawn by other
+        // shaders from then on, made as the first loot falls.)
+        drops.setColorAt(0, new T.Color('#ffffff'));
         scene.add(drops);
         // Flames on burning thickets: a few bright cubes per block, licking.
         const FIRES = 48, fires = new T.InstancedMesh(unitBox, new T.MeshBasicMaterial(), FIRES);
         fires.frustumCulled = false; fires.count = 0;
+        fires.setColorAt(0, new T.Color('#ffffff'));
         scene.add(fires);
         // The torches that stand in the map (render/lamp_view.js), fading as
         // the terrain does; `lamps`, where their lights are (render/view_light.js).
@@ -127,6 +132,14 @@ const viewProps = (() => {
             return warnShapes.get(key);
         }
         const warnMaterial = () => new T.MeshBasicMaterial({ color: '#ff2a1a', transparent: true, opacity: 0, depthWrite: false, side: T.DoubleSide, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 });
+        // One warning of no size, drawn in the world's first frame and
+        // hidden after (`warm`: render/world_view.js): its shader is made
+        // then, not as the first monster winds up, and stays.
+        const nothing = new T.BufferGeometry();
+        nothing.setAttribute('position', new T.Float32BufferAttribute(new Float32Array(9), 3));
+        const warm = new T.Mesh(nothing, warnMaterial());
+        warm.frustumCulled = false;
+        scene.add(warm);
         // `entry`: monster `m`'s own (render/world_view.js), which keeps its
         // warning. (A monster out of sight shows no warning either.)
         function warn(entry, m, visible) {
@@ -147,7 +160,7 @@ const viewProps = (() => {
         function dispose(once) {
             for (const g of warnShapes.values()) once(g, () => g.dispose());
         }
-        return { update, warn, dispose, stirring, lamps: lamps.lights, lampPosts: lamps.posts };
+        return { update, warn, dispose, stirring, warm, lamps: lamps.lights, lampPosts: lamps.posts };
     }
     return { create };
 })();

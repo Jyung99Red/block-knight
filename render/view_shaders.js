@@ -104,13 +104,18 @@ ${lists}${chunk.slice(to + end.length)}`;
     // The engine asks with `lit ? shadow : 1.0`; here it is `if`, and the
     // face's turn is asked too. Lambert and Phong, the lit materials here,
     // take a light by the cosine to the face; a material that lights
-    // faces turned away (toon) would need its own. A three.js whose
-    // shader reads otherwise is left as it is.
+    // faces turned away (toon) would need its own. Nor is it looked up
+    // while the light's shadows are at nothing, where the engine looks
+    // it up and leaves the light as it is: a standing torch's as they
+    // come and go, and the sun's in a dark region, which casts there only
+    // so that every region's shaders are the same ones
+    // (render/view_light.js `retune`). A three.js whose shader reads
+    // otherwise is left as it is.
     function shadowsWhereLit(T) {
         const chunk = T.ShaderChunk.lights_fragment_begin;
-        const asked = /directLight\.color \*= \( directLight\.visible && receiveShadow \) \? (get(?:Point)?Shadow\( (?:point|directional)ShadowMap\[ i \][^;]*?\)) : 1\.0;/g;
-        if ((chunk.match(asked) || []).length !== 2) return;
-        T.ShaderChunk.lights_fragment_begin = chunk.replace(asked, 'if ( directLight.visible && receiveShadow && dot( geometryNormal, directLight.direction ) > 0.0 ) directLight.color *= $1;');
+        const asked = /directLight\.color \*= \( directLight\.visible && receiveShadow \) \? (get(?:Point)?Shadow\( (point|directional)ShadowMap\[ i \][^;]*?\)) : 1\.0;/g;
+        if ((chunk.match(asked) || []).length !== 2 || !chunk.includes('directionalLightShadow.shadowIntensity') || !chunk.includes('pointLightShadow.shadowIntensity')) return;
+        T.ShaderChunk.lights_fragment_begin = chunk.replace(asked, 'if ( directLight.visible && receiveShadow && $2LightShadow.shadowIntensity > 0.0 && dot( geometryNormal, directLight.direction ) > 0.0 ) directLight.color *= $1;');
     }
     // A point light that is out is passed over whole: the torch while it
     // does not burn, and the moving lights nothing has been given

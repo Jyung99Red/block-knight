@@ -76,8 +76,16 @@ const viewLight = (() => {
         // The shadows' maps follow the menu's settings. The torch's keep
         // its light from passing walls (user, 2026-10-06). A shadow map of
         // a new size is made anew on the next frame.
+        // The sun casts in a dark region too, where it had no need to: so
+        // every region's shaders are the same ones, made once
+        // (render/world_view.js `load`). There its shadows are at nothing
+        // (`daylight`), which the shader then does not look up
+        // (render/view_shaders.js `shadowsWhereLit`): the picture is as
+        // it was. Its map there is DARK_SUN texels a side and drawn the
+        // once (`settle`).
+        const DARK_SUN = 16;
         function retune() {
-            sun.castShadow = !dark;
+            sun.castShadow = true;
             const resize = (shadow, size) => {
                 if (shadow.mapSize.x === size) return false;
                 shadow.mapSize.set(size, size);
@@ -87,7 +95,7 @@ const viewLight = (() => {
             // (The texel and the radii whether the size changed or not: a
             // light's map is 512 a side to begin with, the saver quality's
             // sun's on a phone and the ultra quality's torch's.)
-            resize(sun.shadow, tune.sunMap);
+            resize(sun.shadow, dark ? DARK_SUN : tune.sunMap);
             texel = 2 * extent / tune.sunMap;
             sun.shadow.radius = Math.max(1, SUN_SOFT / texel);
             resize(torchLight.shadow, tune.torchMap);
@@ -150,7 +158,12 @@ const viewLight = (() => {
         const doorways = dark ? sim.entities.filter(e => e.type === 'portal').map(e => space.toBlocks(e.x + Math.cos(e.facing) * DOORWAY.inside * U, e.y + Math.sin(e.facing) * DOORWAY.inside * U, 0)).map(([x, , z]) => [x, DOORWAY.height, z]) : [];
         const lampCount = sim.entities.filter(e => e.type === 'lamp').length;
         const gives = lampCount + sim.entities.filter(e => e.type === 'brush').length + doorways.length + Math.max(0, sim.fighters.length - 1);
-        const pool = Array.from({ length: Math.max(0, gives - Math.min(casters.length, lampCount)) }, () => {
+        // (And no fewer lights in all than any world before had,
+        // `tune.gives`: the shaders are written for so many lights, and
+        // with as many in every region they are the same ones and made
+        // once. A light nothing is given is passed over.)
+        tune.gives = Math.max(tune.gives, gives);
+        const pool = Array.from({ length: Math.max(0, tune.gives - casters.length, gives - Math.min(casters.length, lampCount)) }, () => {
             const light = new T.PointLight('#ffffff', 0, 1, 1);
             scene.add(light);
             return light;
@@ -302,7 +315,8 @@ const viewLight = (() => {
         // within SHADE.margin of its reach, this frame or the last. Both
         // every SHADE.refresh seconds besides, for what moves too slowly
         // to count (a body at rest breathes). A map not made yet is drawn
-        // (one never drawn is no texture, and nothing lit would draw).
+        // (one never drawn is no texture, and nothing lit would draw): in
+        // a dark region that is all the sun's is.
         const TORCH_DRIFT = 0.01;
         sun.shadow.autoUpdate = false; torchLight.shadow.autoUpdate = false;
         const sunMap = { u: NaN, v: NaN, aimed: NaN, rev: -1, age: 0, stirred: false };
@@ -312,7 +326,7 @@ const viewLight = (() => {
         function settle(moved, rev, frameSeconds) {
             const stirred = moved.length > 0;
             sunMap.age += frameSeconds;
-            if (!sun.shadow.map || stirred || sunMap.stirred || sunMap.u !== placed.u || sunMap.v !== placed.v || sunMap.aimed !== aimedAt || sunMap.rev !== rev || sunMap.age >= SHADE.refresh) {
+            if (!sun.shadow.map || (!dark && (stirred || sunMap.stirred || sunMap.u !== placed.u || sunMap.v !== placed.v || sunMap.aimed !== aimedAt || sunMap.rev !== rev || sunMap.age >= SHADE.refresh))) {
                 sun.shadow.needsUpdate = true;
                 Object.assign(sunMap, { u: placed.u, v: placed.v, aimed: aimedAt, rev, age: 0 });
             }
@@ -336,7 +350,7 @@ const viewLight = (() => {
             aim(hour);
             hemisphere.color.copy(now.colors[0]); hemisphere.groundColor.copy(now.colors[1]); hemisphere.intensity = now.sky;
             sun.color.copy(now.colors[2]); sun.intensity = now.sun * (dark ? 1 : dayKit.sky(hour).fade);
-            sun.shadow.intensity = now.shadow;
+            sun.shadow.intensity = dark ? 0 : now.shadow;
             sky.copy(now.colors[3]); scene.fog.color.copy(sky);
             for (const m of mists) m.color.copy(sky);
             const d = tune.distance * tune.zoom;
