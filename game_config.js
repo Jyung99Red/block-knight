@@ -505,7 +505,11 @@ const gameConfig = (() => {
         // `margin` blocks of its reach (one torch's a frame at most; a
         // fighter none of whose boxes goes `still` blocks a second is at
         // rest: it only breathes), and every `refresh` seconds whatever
-        // else has changed.
+        // else has changed. The sun's and the carried torch's shadows are
+        // drawn anew by the same three numbers (render/view_light.js
+        // `settle`): while a body moves faster than `still` (for the
+        // torch's, within `margin` of its reach) or the light itself
+        // has moved, and every `refresh` seconds.
         graphics: {
             quality: {
                 saver: { pixelRatio: 1, sunShadow: 512, torchShadow: 128, torchTaps: 8, bounce: true, lampShadows: 0 },

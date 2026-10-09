@@ -247,14 +247,14 @@ const worldView = (() => {
             return [f.id, {
                 rig: rigOf(f.id), ghost,
                 view: cast.character(rigOf(f.id), part => part.kind === 'weapon' || part.tag === 'flame', { ...equipmentModels.lookOf(f.loadout), ...(own ? {} : playerModel.looks.rival) }, { ghost, fade: own ? ground.fade : cast.fade }),
-                lastFacing: f.facing, lean: 0
+                lastFacing: f.facing, lean: 0, solved: null
             }];
         }));
         if (fighters.has(selfId)) light.flameLit(fighters.get(selfId).view.meshes);
         const dummyView = sim.dummy ? cast.character(sim.rigs.dummy) : null;
         // A monster that comes into the world later (a boss called back at
         // its grave) gets its body when it is first drawn.
-        const monsterView = m => ({ body: m, view: cast.character(sim.rigs.monsters[m.kind], () => false, monsterKit.look(m.kind)), warning: null });
+        const monsterView = m => ({ body: m, view: cast.character(sim.rigs.monsters[m.kind], () => false, monsterKit.look(m.kind)), warning: null, solved: null });
         const monsters = new Map(sim.monsters.map(m => [m.id, monsterView(m)]));
         // ---- props (render/view_props.js), the shade of sight
         // (render/view_sight.js), the effects (render/effects.js) ----
@@ -364,6 +364,8 @@ const worldView = (() => {
         function render(current, frameSeconds, bodies, events, shot = null, yaw = C.camera.yaw, pitch = C.camera.pitch) {
             const dt = Math.max(1e-3, frameSeconds);
             clock += frameSeconds;
+            // (What moves this frame is gathered as it is placed, for the shadow maps: `light.settle`.)
+            cast.frame(frameSeconds);
             const shownOf = body => bodies?.get(body.id) || body;
             const me = shownOf(current.fighters.find(f => f.id === selfId) || current.fighters[0]);
             const view = shot ? shotView(shot, me) : null, U = C.world.unitsPerBlock;
@@ -394,7 +396,8 @@ const worldView = (() => {
                 const leanTarget = Math.max(-0.12, Math.min(0.12, 0.015 * omega)) * p.moveBlend;
                 entry.lean += (leanTarget - entry.lean) * Math.min(1, frameSeconds * 10);
                 const pose = playerAnim.present(playerAnim.pose(entry.rig, p), p, { time: clock, lean: entry.lean });
-                const solved = rigKit.solve(entry.rig, pose, space.toBlocks(p.x, p.y, p.h), space.yawOf(p.facing));
+                // (Solved into the same matrices every frame: what reads them keeps none.)
+                const solved = entry.solved = rigKit.solve(entry.rig, pose, space.toBlocks(p.x, p.y, p.h), space.yawOf(p.facing), entry.solved);
                 entry.view.place(solved);
                 entry.view.light(!!f.lit);
                 drawn.push({ id: f.id, body: f, shown: p, rig: entry.rig, solved, blade: entry.view.blade, materials: entry.view.materials, flash: entry.view.flash });
@@ -423,7 +426,7 @@ const worldView = (() => {
                 if (visible) {
                     seen.add(m.id);
                     root[1] -= sink;
-                    entry.view.place(rigKit.solve(rig, monsterKit.pose(rig, shown), root, space.yawOf(shown.facing)));
+                    entry.view.place(entry.solved = rigKit.solve(rig, monsterKit.pose(rig, shown), root, space.yawOf(shown.facing), entry.solved));
                     foes.push({ body: m, view: entry.view, top: monsterKit.height(m.kind) + 0.25, shown });
                 }
                 props.warn(entry, m, visible);
@@ -438,6 +441,7 @@ const worldView = (() => {
                 camera.position.fromArray(view.eye);
                 camera.lookAt(view.look[0], view.look[1], view.look[2]);
                 light.placeSun(view.look[0], view.look[1], view.look[2]);
+                light.settle(cast.motion.at, current.terrain.rev, frameSeconds);
                 ground.cut.open.value = 0; cutSet = false;
                 ground.seeThrough([]);
                 return;
@@ -446,6 +450,7 @@ const worldView = (() => {
             // screen, so they reach its far corners as they do its near ones.
             const ahead = placeCamera(look[0], at[1], look[1], yaw, pitch);
             light.placeSun(look[0] - Math.sin(yaw) * ahead, at[1], look[1] - Math.cos(yaw) * ahead);
+            light.settle(cast.motion.at, current.terrain.rev, frameSeconds);
             // Cut the blocks between the camera and this fighter's chest,
             // while some do hide the fighter; the hole eases open and shut.
             ground.cut.center.value.set(at[0], at[1] + 1, at[2]);

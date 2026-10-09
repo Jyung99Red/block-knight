@@ -27,6 +27,19 @@ const viewBodies = (() => {
         // `embodied`): none of it left out, and fading as the look has
         // other bodies fade, unless told.
         const solid = { value: 0 }, bodyFade = { value: 0 };
+        // What has moved this frame, for the shadows that are drawn anew
+        // only when something has (render/view_light.js `settle`): `at`,
+        // where each character stands ([x, z], blocks) that was placed
+        // with a box more than `least` blocks from where it was a frame
+        // ago, or that has just been shown or hidden. At rest it only
+        // breathes, which shows in no shadow (graphics.lamp.shadow
+        // `still`, blocks a second). The world view begins each frame
+        // with `frame`; the props add theirs (render/view_props.js).
+        const STILL = C.graphics.lamp.shadow.still, motion = { least: 0, at: [] };
+        function frame(frameSeconds) {
+            motion.at.length = 0;
+            motion.least = STILL * Math.max(frameSeconds, 1 / 120);
+        }
         function character(rig, apart = () => false, look = {}, { ghost = solid, fade = bodyFade } = {}) {
             const thin = made => viewShaders.embodied(T, made, ghost, fade);
             const material = thin(new T.MeshLambertMaterial({ map: tx.grain, vertexColors: true }));
@@ -87,6 +100,8 @@ const viewBodies = (() => {
             const flames = loose.filter(l => rig.parts[l.i].tag === 'flame').map(l => l.mesh);
             for (const f of flames) { f.material.emissive.set(P[rig.parts[loose.find(l => l.mesh === f).i].color]); f.castShadow = false; }
             let lit = false;
+            // Where its boxes were when it was last placed (x, y, z each); null before that, and once hidden.
+            let spots = null;
             return {
                 mesh, blade: loose.find(l => rig.parts[l.i].kind === 'weapon')?.mesh.material || null, flames,
                 // Every mesh of it: this phone's own fighter's cast their
@@ -109,8 +124,18 @@ const viewBodies = (() => {
                         if (grow) line.matrix.multiply(grown.makeScale(...grow));
                         line.matrixWorldNeedsUpdate = true;
                     }
+                    let moved = !spots;
+                    spots ||= new Float64Array(solved.parts.length * 3);
+                    for (let i = 0, o = 0; o < spots.length; i++, o += 3) {
+                        const m = solved.parts[i];
+                        if (!moved && Math.abs(m[12] - spots[o]) + Math.abs(m[13] - spots[o + 1]) + Math.abs(m[14] - spots[o + 2]) > motion.least) moved = true;
+                        spots[o] = m[12]; spots[o + 1] = m[13]; spots[o + 2] = m[14];
+                    }
+                    if (moved) motion.at.push([spots[0], spots[2]]);
                 },
                 show(visible) {
+                    // (Hidden, its shadow goes from where it stood; shown again, its next placing counts as a move.)
+                    if (!visible) { if (mesh.visible && spots) motion.at.push([spots[0], spots[2]]); spots = null; }
                     mesh.visible = visible;
                     for (const l of loose) l.mesh.visible = visible && (lit || rig.parts[l.i].tag !== 'flame');
                     for (const l of lines) l.line.visible = visible;
@@ -120,7 +145,7 @@ const viewBodies = (() => {
         }
         // `fade`: what other bodies' colours fade by (render/world_view.js
         // sets it each frame from the hour's look).
-        return { character, fade: bodyFade };
+        return { character, fade: bodyFade, motion, frame };
     }
     return { create };
 })();

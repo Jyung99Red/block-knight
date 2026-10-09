@@ -26,9 +26,13 @@ const playerAnim = (() => {
     const keysOf = (name, part) => keyed[`${name}.${part}`] || (keyed[`${name}.${part}`] = cycleKeys(playerPoses[name][part]));
 
     // Raise or lower the whole body so its lowest box rests on the ground.
+    // (Solved into the same matrices every time, a set to a skeleton:
+    // nothing of them is kept.)
+    const stood = new WeakMap();
     function grounded(rig, pose) {
-        const low = rigKit.lowest(rig, rigKit.solve(rig, pose));
-        return rigKit.add(pose, { base: { py: -low / rig.scale } });
+        const solved = rigKit.solve(rig, pose, undefined, undefined, stood.get(rig));
+        stood.set(rig, solved);
+        return rigKit.add(pose, { base: { py: -rigKit.lowest(rig, solved) / rig.scale } });
     }
     // A pure gait, measured once per skeleton. Each step starts as the
     // right foot comes down (key 0) and stays down for `stance` of the

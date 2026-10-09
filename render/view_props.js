@@ -3,9 +3,11 @@
 // the map and a monster's range warning. Drawing only.
 const viewProps = (() => {
     // `stage`: what the world's parts share (render/world_view.js `build`);
-    // `character`: render/view_bodies.js, for the chests. `far`: how far
-    // from the camera's focus (blocks) loot is drawn.
-    function create({ T, scene, sim, tx, ground, far: FAR }, { character }) {
+    // `character`: render/view_bodies.js, for the chests; `motion`: what
+    // has moved this frame, there too -- the loot drawn turns, and is
+    // added to it. `far`: how far from the camera's focus (blocks) loot
+    // is drawn.
+    function create({ T, scene, sim, tx, ground, far: FAR }, { character, motion }) {
         const C = gameConfig, P = palette;
         // ---- props: portal openings, chests, loot on the ground ----
         const portals = sim.entities.filter(e => e.type === 'portal').map(e => {
@@ -89,6 +91,7 @@ const viewProps = (() => {
                 place.scale.set(...look.size);
                 place.updateMatrix();
                 drops.setMatrixAt(n, place.matrix); drops.setColorAt(n, tint.set(P[look.color]));
+                motion.at.push([x, z]);
                 n++;
             }
             drops.count = n;

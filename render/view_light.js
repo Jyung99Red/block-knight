@@ -278,11 +278,53 @@ const viewLight = (() => {
         // One texel of the sun's shadow map, blocks (`retune`).
         let texel = 1;
         const focus = new T.Vector3();
+        // (`placed`: where its shadow box is now, across the light: `settle`.)
+        const placed = { u: NaN, v: NaN };
         function placeSun(x, y, z) {
             focus.set(x, y, z);
             const u = Math.round(focus.dot(lightRight) / texel) * texel, v = Math.round(focus.dot(lightUp) / texel) * texel, w = focus.dot(lightDir);
             sun.target.position.copy(lightRight).multiplyScalar(u).addScaledVector(lightUp, v).addScaledVector(lightDir, w);
             sun.position.copy(sun.target.position).addScaledVector(lightDir, 25);
+            placed.u = u; placed.v = v;
+        }
+        // The sun's and the carried torch's shadow maps are drawn anew
+        // only when what they show has changed, as the standing torches'
+        // are (`kindle`); a map left as it is goes on being looked up
+        // where it was drawn from, so the shadows stay where they lie.
+        // Called once everything is placed for the frame. `moved`: where
+        // what casts a shadow has moved this frame ([x, z] each, blocks:
+        // render/view_bodies.js `motion`); `rev`: the terrain's revision.
+        // The sun's: when its box has gone a texel on or the sun a step
+        // (`placeSun`, `aim`), the terrain has changed, or anything
+        // moved this frame or the last. The torch's, while it burns: when
+        // it is lit, its light has gone TORCH_DRIFT blocks from where the
+        // map was drawn from, the terrain has changed, or something moved
+        // within SHADE.margin of its reach, this frame or the last. Both
+        // every SHADE.refresh seconds besides, for what moves too slowly
+        // to count (a body at rest breathes). A map not made yet is drawn
+        // (one never drawn is no texture, and nothing lit would draw).
+        const TORCH_DRIFT = 0.01;
+        sun.shadow.autoUpdate = false; torchLight.shadow.autoUpdate = false;
+        const sunMap = { u: NaN, v: NaN, aimed: NaN, rev: -1, age: 0, stirred: false };
+        const torchMap = { at: new T.Vector3(), rev: -1, age: 0, stirred: false, burning: false };
+        // Does this phone's fighter's torch burn (`frame`)?
+        let burning = false;
+        function settle(moved, rev, frameSeconds) {
+            const stirred = moved.length > 0;
+            sunMap.age += frameSeconds;
+            if (!sun.shadow.map || stirred || sunMap.stirred || sunMap.u !== placed.u || sunMap.v !== placed.v || sunMap.aimed !== aimedAt || sunMap.rev !== rev || sunMap.age >= SHADE.refresh) {
+                sun.shadow.needsUpdate = true;
+                Object.assign(sunMap, { u: placed.u, v: placed.v, aimed: aimedAt, rev, age: 0 });
+            }
+            sunMap.stirred = stirred;
+            const at = torchLight.position, within = (TORCH.reach + SHADE.margin) ** 2;
+            const near = burning && moved.some(([x, z]) => (x - at.x) ** 2 + (z - at.z) ** 2 < within);
+            torchMap.age += frameSeconds;
+            if (!torchLight.shadow.map || (burning && (!torchMap.burning || near || torchMap.stirred || torchMap.rev !== rev || torchMap.age >= SHADE.refresh || at.distanceToSquared(torchMap.at) > TORCH_DRIFT ** 2))) {
+                torchLight.shadow.needsUpdate = true;
+                torchMap.at.copy(at); torchMap.rev = rev; torchMap.age = 0;
+            }
+            torchMap.stirred = near; torchMap.burning = burning;
         }
         // The hour's light on everything: the sky's, the sun's or the moon's
         // (fading in after it rises and out before it sets), the fog and
@@ -368,8 +410,8 @@ const viewLight = (() => {
                 torchLight.position.set(...flameOf(bearer, flameShift));
                 torchLight.intensity = now.torch * flicker(0);
             } else torchLight.intensity = 0;
-            // (Drawn at least once: a shadow map never drawn is no texture, and nothing lit would draw.)
-            torchLight.shadow.autoUpdate = !!bearer || !torchLight.shadow.map;
+            // (Its shadow map is drawn only while it burns: `settle`.)
+            burning = !!bearer;
             const glowing = [];
             // Block light from the same sources, in steps of a tenth.
             const glows = [], tenth = v => Math.round(v * 10) / 10, rgbOf = (color, k) => glowColour.set(color).toArray().map(v => tenth(v * k));
@@ -421,7 +463,7 @@ const viewLight = (() => {
             for (const material of shy) material.dispose();
         }
         return {
-            now, sky, mists, retune, frame, placeSun, dispose,
+            now, sky, mists, retune, frame, placeSun, settle, dispose,
             // `meshes`: the torch's bearer's own body, which casts its
             // shadow as the flame does; the standing torches' posts, which
             // cast none in their own light.

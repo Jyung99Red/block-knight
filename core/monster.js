@@ -89,10 +89,13 @@ const monsterKit = (() => {
         return rigKit.add(P.idle, out);
     }
     // Lift or lower the whole body so its lowest box (any but the weapon)
-    // rests on the ground.
+    // rests on the ground. (Solved into the same matrices every time, a
+    // set to a skeleton: nothing of them is kept.)
+    const stood = new WeakMap(), unarmed = part => part.kind !== 'weapon';
     function grounded(rigData, pose) {
-        const low = rigKit.lowest(rigData, rigKit.solve(rigData, pose), part => part.kind !== 'weapon');
-        return rigKit.add(pose, { base: { py: -low / rigData.scale } });
+        const solved = rigKit.solve(rigData, pose, undefined, undefined, stood.get(rigData));
+        stood.set(rigData, solved);
+        return rigKit.add(pose, { base: { py: -rigKit.lowest(rigData, solved, unarmed) / rigData.scale } });
     }
     // A move's key poses, mirrored left for right when `flip`.
     const mirrored = new WeakMap();

@@ -1,10 +1,25 @@
 // The world view's changes to three.js shader text (render/world_view.js):
 // the sun's and the torch's soft shadows with more samples, shadows looked
-// up only where their light falls and lights that are out passed over, the
-// light probes read at a face's corners, and what every character's
-// material reads (the ghost of a hidden fighter, the fade of colours).
-// Drawing only.
+// up only where their light falls, lights that are out or out of reach
+// passed over, the light probes read at a face's corners, and what every
+// character's material reads (the ghost of a hidden fighter, the fade of
+// colours). Drawing only.
 const viewShaders = (() => {
+    // The samples of the engine's soft shadows lie on a disc
+    // (`vogelDiskSample`: sample k of n is the golden angle times k round
+    // it and the square root of (k + 0.5) / n out), which noise turns from
+    // pixel to pixel. The engine works out the cosine and sine of every
+    // sample's angle at every pixel; here the disc's `n` samples are a
+    // constant list (`disc`, as shader text) and each is turned by the
+    // pixel's own angle, whose cosine and sine are worked out once
+    // (`turn`; `TURNED` turns sample `s`). The same samples, but for
+    // rounding.
+    const GOLDEN = 2.399963229728653;
+    const disc = (name, n) => `const vec2 ${name}[${n}] = vec2[${n}]( ${Array.from({ length: n }, (_, k) => {
+        const out = Math.sqrt((k + 0.5) / n);
+        return `vec2( ${(out * Math.cos(k * GOLDEN)).toFixed(9)}, ${(out * Math.sin(k * GOLDEN)).toFixed(9)} )`;
+    }).join(', ')} );`;
+    const TURN = 'vec2 turn = vec2( cos( phi ), sin( phi ) );', TURNED = 'vec2( s.x * turn.x - s.y * turn.y, s.x * turn.y + s.y * turn.x )';
     // The engine's soft shadows take five samples in a disc that noise
     // turns from pixel to pixel; on a large shadow map (SUN_WIDE texels
     // or more) that disc is many texels wide and the five show as grain.
@@ -24,13 +39,19 @@ const viewShaders = (() => {
     function smoothShadows(T) {
         const chunk = T.ShaderChunk.shadowmap_pars_fragment, from = chunk.indexOf('shadow = ('), end = ') * 0.2;', to = chunk.indexOf(end, from);
         if (from < 0 || to < 0 || !chunk.slice(from, to).includes('vogelDiskSample( 4, 5, phi )') || !chunk.includes('vec2 shadowMapSize')) return;
+        const taken = (name, n) => `${disc(name, n)}
+    for ( int k = 0; k < ${n}; k ++ ) {
+        vec2 s = ${name}[ k ];
+        shadow += textureLod( shadowMap, vec3( shadowCoord.xy + ${TURNED} * radius, shadowCoord.z ), 0.0 );
+    }
+    shadow /= ${n}.0;`;
         T.ShaderChunk.shadowmap_pars_fragment = `${chunk.slice(0, from)}shadow = 0.0;
-int taps = shadowMapSize.x >= ${SUN_WIDE}.0 ? ${SUN_TAPS} : 5;
-for ( int k = 0; k < ${SUN_TAPS}; k ++ ) {
-    if ( k >= taps ) break;
-    shadow += textureLod( shadowMap, vec3( shadowCoord.xy + vogelDiskSample( k, taps, phi ) * radius, shadowCoord.z ), 0.0 );
-}
-shadow /= float( taps );${chunk.slice(to + end.length)}`;
+${TURN}
+if ( shadowMapSize.x >= ${SUN_WIDE}.0 ) {
+    ${taken('sunWide', SUN_TAPS)}
+} else {
+    ${taken('sunNarrow', 5)}
+}${chunk.slice(to + end.length)}`;
     }
     // The engine's point light shadows take five samples; `taps` samples
     // of the same disc are taken instead, or a soft edge shows as grain.
@@ -52,14 +73,25 @@ shadow /= float( taps );${chunk.slice(to + end.length)}`;
         const chunk = T.ShaderChunk.shadowmap_pars_fragment, start = 'vec2 sample0 = vogelDiskSample( 0, 5, phi );', end = ') * 0.2;';
         const from = chunk.indexOf(start), to = chunk.indexOf(end, from);
         if (from < 0 || to < 0 || !chunk.slice(from, to).includes('bd3D + ( tangent * sample4.x + bitangent * sample4.y ) * texelSize')) return;
+        const taken = (name, n) => `${disc(name, n)}
+    for ( int k = 0; k < ${n}; k ++ ) {
+        vec2 s = ${name}[ k ];
+        s = ${TURNED};
+        shadow += ${direct3d ? 'textureGrad' : 'texture'}( shadowMap, vec4( bd3D + ( tangent * s.x + bitangent * s.y ) * texelSize, dp )${direct3d ? ', vec3( 0.0 ), vec3( 0.0 )' : ''} );
+    }
+    shadow /= ${n}.0;`;
+        // (One list where the carried torch and the standing ones take as many.)
+        const lists = taps === LAMP_TAPS ? `{
+    ${taken('torchDisc', taps)}
+}` : `if ( pointShadowTaps == ${taps} ) {
+    ${taken('torchDisc', taps)}
+} else {
+    ${taken('lampDisc', LAMP_TAPS)}
+}`;
         T.ShaderChunk.shadowmap_pars_fragment = `int pointShadowTaps = ${taps};
 ${chunk.slice(0, from)}shadow = 0.0;
-for ( int k = 0; k < ${Math.max(taps, LAMP_TAPS)}; k ++ ) {
-    if ( k >= pointShadowTaps ) break;
-    vec2 s = vogelDiskSample( k, pointShadowTaps, phi );
-    shadow += ${direct3d ? 'textureGrad' : 'texture'}( shadowMap, vec4( bd3D + ( tangent * s.x + bitangent * s.y ) * texelSize, dp )${direct3d ? ', vec3( 0.0 ), vec3( 0.0 )' : ''} );
-}
-shadow /= float( pointShadowTaps );${chunk.slice(to + end.length)}`;
+${TURN}
+${lists}${chunk.slice(to + end.length)}`;
         // (Where the engine's lights read otherwise, every point light takes the torch's.)
         const each = 'pointLightShadow = pointLightShadows[ i ];';
         T.ShaderChunk.lights_fragment_begin = T.ShaderChunk.lights_fragment_begin.replace(each, `${each}
@@ -86,15 +118,23 @@ shadow /= float( pointShadowTaps );${chunk.slice(to + end.length)}`;
     // among them). They are always in the shader, and the engine works
     // each one out at every pixel to add nothing: by Vulkan, five of them
     // out (the torch and four moving lights, as it was) were over a
-    // quarter of a frame by day. A three.js whose shader reads otherwise
-    // is left as it is.
+    // quarter of a frame by day. A light that burns is passed over the
+    // same way at every pixel past its reach: the engine works its
+    // falling off out there too, to nothing (a light with a reach gives
+    // none at it or beyond), and with every standing torch on the
+    // picture lit (user, 2026-10-09) most pixels are past the reach of
+    // most of them. The picture is the same. A three.js whose shader
+    // reads otherwise is left as it is.
     function darkLightsSkipped(T) {
         const chunk = T.ShaderChunk.lights_fragment_begin, from = chunk.indexOf('#if ( NUM_POINT_LIGHTS > 0 )');
         const first = 'getPointLightInfo( pointLight, geometryPosition, directLight );', last = 'RE_Direct( directLight, geometryPosition, geometryNormal, geometryViewDir, geometryClearcoatNormal, material, reflectedLight );';
         const a = chunk.indexOf(first, from), b = chunk.indexOf(last, a), end = chunk.indexOf('#pragma unroll_loop_end', a);
         if (from < 0 || a < 0 || b < 0 || end < b) return;
         T.ShaderChunk.lights_fragment_begin = `${chunk.slice(0, a)}if ( pointLight.color != vec3( 0.0 ) ) {
+		vec3 pointLightOff = pointLight.position - geometryPosition;
+		if ( pointLight.distance <= 0.0 || dot( pointLightOff, pointLightOff ) < pointLight.distance * pointLight.distance ) {
 		${chunk.slice(a, b + last.length)}
+		}
 		}${chunk.slice(b + last.length)}`;
     }
     // The light probes (render/terrain_light.js) worked out at each corner

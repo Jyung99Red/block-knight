@@ -37,19 +37,32 @@ const rigKit = (() => {
         return { bones, index, parts, scale };
     }
 
+    // Where each box hangs on its bone, as a matrix: it never changes, so
+    // it is worked out once a rig.
+    const hung = new WeakMap();
+    function hungOf(rig) {
+        let at = hung.get(rig);
+        if (!at) hung.set(rig, at = rig.parts.map(part => math3d.compose(part.at[0], part.at[1], part.at[2], 0, 0, 0)));
+        return at;
+    }
     // World matrices of every bone and box for `pose`, with the model's base
-    // at block position `root` = [x, y, z] turned by `yaw`.
-    function solve(rig, pose, root = [0, 0, 0], yaw = 0) {
-        const M = math3d, local = new Float64Array(16), k = rig.scale;
-        const rootMatrix = M.compose(root[0], root[1], root[2], 0, yaw, 0);
-        const bones = rig.bones.map(() => new Float64Array(16));
+    // at block position `root` = [x, y, z] turned by `yaw`. `into`: what an
+    // earlier solve of this same rig returned, to be written over and
+    // returned again -- for a caller that solves again and again and keeps
+    // nothing of the time before.
+    const local = new Float64Array(16), rootMatrix = new Float64Array(16);
+    function solve(rig, pose, root = [0, 0, 0], yaw = 0, into = null) {
+        const M = math3d, k = rig.scale, at = hungOf(rig);
+        const bones = into ? into.bones : rig.bones.map(() => new Float64Array(16));
+        const parts = into ? into.parts : rig.parts.map(() => new Float64Array(16));
+        M.compose(root[0], root[1], root[2], 0, yaw, 0, rootMatrix);
         rig.bones.forEach((b, i) => {
             const p = pose[b.name] || {};
             M.compose(b.at[0] + (p.px || 0) * k, b.at[1] + (p.py || 0) * k, b.at[2] + (p.pz || 0) * k, p.rx || 0, p.ry || 0, p.rz || 0, local);
             M.multiply(b.parent < 0 ? rootMatrix : bones[b.parent], local, bones[i]);
         });
-        const parts = rig.parts.map(part => M.multiply(bones[part.bone], M.compose(part.at[0], part.at[1], part.at[2], 0, 0, 0)));
-        return { bones, parts };
+        rig.parts.forEach((part, i) => M.multiply(bones[part.bone], at[i], parts[i]));
+        return into || { bones, parts };
     }
     // Oriented boxes of the given kind(s), for hit tests.
     function boxes(rig, solved, kinds = ['body']) {

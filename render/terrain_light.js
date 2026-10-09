@@ -70,6 +70,20 @@ const terrainLight = (() => {
         const paint = (c, y, r) => y < 0 || y >= h || c < x0 || r < z0 || c >= x0 + w || r >= z0 + d ? null : paints[cells[index(c, y, r)]];
         return { x0, z0, w, d, h, cells, index, solid, paint };
     }
+    // The cells that grid `b` fills otherwise than grid `a` does, each
+    // [c, y, r, whether one is filled and the other not], or null where
+    // the grids are not of one size (then anything may have changed).
+    // What was worked out on `a` far enough from all of them holds on `b`
+    // (`sky`, `probes`).
+    function changes(a, b) {
+        if (a.x0 !== b.x0 || a.z0 !== b.z0 || a.w !== b.w || a.d !== b.d || a.h !== b.h) return null;
+        const out = [];
+        for (let y = 0; y < a.h; y++) for (let r = a.z0; r < a.z0 + a.d; r++) for (let c = a.x0; c < a.x0 + a.w; c++) {
+            const was = a.paint(c, y, r), now = b.paint(c, y, r);
+            if (was !== now) out.push([c, y, r, !was !== !now]);
+        }
+        return out;
+    }
 
     // Directions over the sky as a face looking along `n` sees it: spread
     // evenly by how much each counts to a face (more straight out than
@@ -94,9 +108,20 @@ const terrainLight = (() => {
     // The sky a face sees, 0..1, by the open cell (c, y, r) it looks out
     // into and the way it looks (`n`): the share of its rays that get out
     // of the grid's blocks within SKY.far, walked cell by cell. Worked out
-    // once per cell and way, until the grid changes.
-    function sky(g) {
+    // once per cell and way, until the grid changes. `kept`: { from, changed }
+    // -- the sky of the grid as it was (what this returned for it, a grid
+    // of the same size) and the cells filled then and empty now or the
+    // other way ([c, y, r] each: `changes`). A ray goes level or up, into
+    // no cell further than SKY_REACH from where it starts: so what was
+    // worked out further than that from every one of them, or higher, is
+    // taken over as it is, and the rest of it is worked out again.
+    // `other` (on what is returned; by cell and way, as `seen`) is 2
+    // where that came out otherwise than it was -- null with nothing
+    // worked out again.
+    const SKY_REACH = Math.ceil(SKY.far) + 1;
+    function sky(g, kept = null) {
         const seen = new Float32Array(g.w * g.d * g.h * SIDE.length).fill(-1), { cells, x0, z0, w, d, h } = g, far = SKY.far;
+        let other = null;
         // Does the ray from the middle of (c, y, r) along (dx, dy, dz), dy > 0, get out?
         function free(c, y, r, dx, dy, dz) {
             const sc = dx > 0 ? 1 : -1, sz = dz > 0 ? 1 : -1, ax = Math.abs(dx), az = Math.abs(dz);
@@ -109,16 +134,37 @@ const terrainLight = (() => {
                 if (c >= x0 && r >= z0 && c < x0 + w && r < z0 + d && cells[(y * d + r - z0) * w + c - x0] !== 0) return false;
             }
         }
-        return function at(c, y, r, n) {
+        // The share of the rays of side `s` that get out from (c, y, r).
+        function share(c, y, r, s) {
+            const rays = RAYS[s];
+            let open = 0;
+            for (let k = 0; k < rays.length; k += 3) if (free(c, y, r, rays[k], rays[k + 1], rays[k + 2])) open++;
+            return open / (rays.length / 3);
+        }
+        if (kept && kept.from.seen.length === seen.length) {
+            const was = kept.from.seen;
+            seen.set(was);
+            if (kept.changed.length) other = new Uint8Array(seen.length);
+            for (const [c, top, r] of kept.changed) {
+                for (let rr = Math.max(z0, r - SKY_REACH); rr <= Math.min(z0 + d - 1, r + SKY_REACH); rr++) for (let cc = Math.max(x0, c - SKY_REACH); cc <= Math.min(x0 + w - 1, c + SKY_REACH); cc++) for (let y = 0; y <= Math.min(h - 1, top); y++) {
+                    for (let s = 0, i = g.index(cc, y, rr) * SIDE.length; s < SIDE.length; s++, i++) {
+                        if (was[i] < 0 || other[i]) continue;
+                        seen[i] = share(cc, y, rr, s);
+                        other[i] = seen[i] === was[i] ? 1 : 2;
+                    }
+                }
+            }
+        }
+        function at(c, y, r, n) {
             if (y >= h || c < x0 || r < z0 || c >= x0 + w || r >= z0 + d) return 1;
             if (y < 0) return 0;
             const s = sideOf(n), i = g.index(c, y, r) * SIDE.length + s;
-            if (seen[i] >= 0) return seen[i];
-            const rays = RAYS[s], count = rays.length / 3;
-            let open = 0;
-            for (let k = 0; k < rays.length; k += 3) if (free(c, y, r, rays[k], rays[k + 1], rays[k + 2])) open++;
-            return seen[i] = open / count;
-        };
+            if (seen[i] < 0) seen[i] = share(c, y, r, s);
+            return seen[i];
+        }
+        // (What has been worked out so far, for the grid's next sky to take over.)
+        at.seen = seen; at.other = other;
+        return at;
     }
     // How much of the sky's light a face keeps where it sees `share` of the sky.
     const skyShade = share => SKY.floor + (1 - SKY.floor) * share;
@@ -230,21 +276,42 @@ const terrainLight = (() => {
     // probes stand (`min`, `max`, blocks; `count` along x, y, z) and their
     // numbers, 27 a probe (nine per colour, colour by colour), x fastest,
     // then y, then z. A probe inside a block takes a neighbour's numbers.
-    function probes(g, t, { colour, ground, skyAt }) {
+    // `reads` is the sky each probe's rays read, by cell and way as
+    // `sky` keeps it (-1: none). `kept`: { from, changed } -- what this
+    // returned for the grid as it was, and the cells filled otherwise
+    // since (`changes`) or with another ground ([c, y, r] each). A
+    // probe's ray goes into no cell further than PROBE_REACH from it: a
+    // probe further than that from every one of them, none of whose rays
+    // reads a sky that is now another (`skyAt.other`), keeps its numbers.
+    const PROBE_REACH = Math.ceil(PROBES.far) + 1;
+    function probes(g, t, { colour, ground, skyAt }, kept = null) {
         const { spacing, heights } = PROBES, nx = Math.ceil((t.width - 1) / spacing) + 1, nz = Math.ceil((t.height - 1) / spacing) + 1, ny = heights.length;
-        const min = [0.5, heights[0], 0.5], max = [0.5 + (nx - 1) * spacing, heights[ny - 1], 0.5 + (nz - 1) * spacing];
-        const sh = new Float32Array(nx * ny * nz * 27), inside = new Uint8Array(nx * ny * nz), weight = 4 * Math.PI / ROUND.length;
+        const min = [0.5, heights[0], 0.5], max = [0.5 + (nx - 1) * spacing, heights[ny - 1], 0.5 + (nz - 1) * spacing], rays = ROUND.length;
+        const sh = new Float32Array(nx * ny * nz * 27), reads = new Int32Array(nx * ny * nz * rays).fill(-1), inside = new Uint8Array(nx * ny * nz), weight = 4 * Math.PI / rays;
         const bases = ROUND.map(basis), hit = new Int32Array(9), n = [0, 0, 0], known = new Map();
         const colours = name => { if (!known.has(name)) known.set(name, colour(name)); return known.get(name); };
+        // Where `sky` keeps the sky of cell (c, y, r) looking along `n` (-1 outside the grid, where none is worked out).
+        const entry = (c, y, r) => y < 0 || y >= g.h || c < g.x0 || r < g.z0 || c >= g.x0 + g.w || r >= g.z0 + g.d ? -1 : g.index(c, y, r) * SIDE.length + sideOf(n);
+        // The columns of probes (by i and k) near a change; and does probe `p` read a sky that is now another?
+        const was = kept && kept.from.sh.length === sh.length ? kept.from : null, near = was && new Uint8Array(nx * nz), other = was && skyAt.other;
+        if (was) for (const [c, , r] of kept.changed) for (let k = 0; k < nz; k++) for (let i = 0; i < nx; i++) {
+            if (Math.abs(Math.floor(min[0] + i * spacing) - c) <= PROBE_REACH && Math.abs(Math.floor(min[2] + k * spacing) - r) <= PROBE_REACH) near[k * nx + i] = 1;
+        }
+        const stale = p => { for (let q = p * rays; q < (p + 1) * rays; q++) if (was.reads[q] >= 0 && other[was.reads[q]] === 2) return true; return false; };
         for (let k = 0; k < nz; k++) for (let j = 0; j < ny; j++) for (let i = 0; i < nx; i++) {
             const p = (k * ny + j) * nx + i, x = min[0] + i * spacing, y = heights[j], z = min[2] + k * spacing;
             if (g.solid(Math.floor(x), Math.floor(y), Math.floor(z))) { inside[p] = 1; continue; }
-            for (let q = 0; q < ROUND.length; q++) {
+            if (was && !near[k * nx + i] && !(other && stale(p))) {
+                sh.set(was.sh.subarray(p * 27, p * 27 + 27), p * 27); reads.set(was.reads.subarray(p * rays, (p + 1) * rays), p * rays);
+                continue;
+            }
+            for (let q = 0; q < rays; q++) {
                 const [dx, dy, dz] = ROUND[q];
                 if (!march(g, x, y, z, dx, dy, dz, PROBES.far, hit)) continue;
                 const name = hit[1] < 0 ? ground(hit[0], hit[2]) : g.paint(hit[0], hit[1], hit[2]), rgb = name && colours(name);
                 if (!rgb) continue;
                 n[0] = hit[6]; n[1] = hit[7]; n[2] = hit[8];
+                if (n[1] >= 0) reads[p * rays + q] = entry(hit[3], hit[4], hit[5]);
                 const lit = skyShade(n[1] < 0 ? 0 : skyAt(hit[3], hit[4], hit[5], n)) * weight, Y = bases[q], o = p * 27;
                 for (let b = 0; b < 9; b++) { const v = lit * Y[b]; sh[o + b] += rgb[0] * v; sh[o + 9 + b] += rgb[1] * v; sh[o + 18 + b] += rgb[2] * v; }
             }
@@ -262,8 +329,8 @@ const terrainLight = (() => {
                 break;
             }
         }
-        return { min, max, count: [nx, ny, nz], sh };
+        return { min, max, count: [nx, ny, nz], sh, reads };
     }
 
-    return { SKY, PROBES, blocks, sky, corners, skyShade, shuts, blockLight, probes };
+    return { SKY, PROBES, blocks, changes, sky, corners, skyShade, shuts, blockLight, probes };
 })();

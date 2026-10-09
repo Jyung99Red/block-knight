@@ -361,8 +361,9 @@ if (${leaves ? 'false' : 'true'} && cutOn > 0.5 && cutOpen > 0.01 && vCutPos.y >
         const column = (c, r) => terrainKit.inside(t, c, r) && terrainKit.isSolid(terrainKit.kindAt(t, c, r));
         // The opaque blocks (the ground, the columns, decor) as a grid, and
         // the sky each open cell sees (render/terrain_light.js); both made
-        // anew when the terrain changes.
-        let blocks = null, skyAt = null;
+        // anew when the terrain changes; `grounds`, what the ground was
+        // under each cell then (`groundOf`, row by row).
+        let blocks = null, skyAt = null, grounds = [];
         // Does an opaque block fill (c, y, r)?
         const opaque = (c, y, r) => blocks.solid(c, y, r);
         // Does it hide a block's face against it? A crown's leaves do not:
@@ -605,15 +606,23 @@ if (${leaves ? 'false' : 'true'} && cutOn > 0.5 && cutOpen > 0.01 && vCutPos.y >
             const k = terrainKit.kindAt(t, c, r);
             return k === K.drop ? null : k === K.water ? 'water' : GROUND[k] || floorTile;
         };
-        function bake() {
-            baked = terrainLight.probes(blocks, t, { colour: colourOf, ground: groundOf, skyAt });
-            const [nx, ny, nz] = baked.count;
-            probeGrid.texture?.dispose();
-            const texture = new T.Data3DTexture(new Uint16Array(nx * ny * 7 * (nz + 2) * 4), nx, ny, 7 * (nz + 2));
-            Object.assign(texture, { format: T.RGBAFormat, type: T.HalfFloatType, magFilter: T.LinearFilter, minFilter: T.LinearFilter });
-            probeGrid.texture = texture;
-            probeGrid.boundingBox.min.fromArray(baked.min); probeGrid.boundingBox.max.fromArray(baked.max);
-            probeGrid.resolution.set(nx, ny, nz);
+        // `changed`: the cells that have changed since the last look round
+        // (`update`), or null for all of it: only the probes near them
+        // look round again (terrainLight.probes). The probes stand where
+        // they stood, so their texture stays; `bounce` lays the new
+        // numbers into it.
+        function bake(changed = null) {
+            const before = baked;
+            baked = terrainLight.probes(blocks, t, { colour: colourOf, ground: groundOf, skyAt }, before && changed && { from: before, changed });
+            if (!before || !probeGrid.texture || before.count.some((v, i) => v !== baked.count[i])) {
+                const [nx, ny, nz] = baked.count;
+                probeGrid.texture?.dispose();
+                const texture = new T.Data3DTexture(new Uint16Array(nx * ny * 7 * (nz + 2) * 4), nx, ny, 7 * (nz + 2));
+                Object.assign(texture, { format: T.RGBAFormat, type: T.HalfFloatType, magFilter: T.LinearFilter, minFilter: T.LinearFilter });
+                probeGrid.texture = texture;
+                probeGrid.boundingBox.min.fromArray(baked.min); probeGrid.boundingBox.max.fromArray(baked.max);
+                probeGrid.resolution.set(nx, ny, nz);
+            }
             lastBounce.fill(-1);
         }
         // The light the ground and the walls are lit by now ([r, g, b],
@@ -647,9 +656,20 @@ if (${leaves ? 'false' : 'true'} && cutOn > 0.5 && cutOpen > 0.01 && vCutPos.y >
                 decoKeys = new Set(); top = 0;
                 for (const [key, d] of deco) { const [x, y, z] = key.split(',').map(Number); if (d.tile !== 'leaves') decoKeys.add(decoKey(x, y, z)); top = Math.max(top, y + 1); }
                 for (let r = 0; r < t.height; r++) for (let c = 0; c < t.width; c++) if (terrainKit.isSolid(terrainKit.kindAt(t, c, r))) top = Math.max(top, terrainKit.levelAt(t, c, r));
-                blocks = terrainLight.blocks(t, [...deco].map(([key, d]) => [...key.split(',').map(Number), d.tile]));
-                skyAt = terrainLight.sky(blocks);
-                if (probes) bake();
+                // The light worked out on the grid -- the sky each cell
+                // sees, the probes -- is worked out again only as far as
+                // the change reaches (`changed`: the cells filled
+                // otherwise, and for the probes those whose ground is
+                // another too; null the first time, for all of it). A
+                // herb picked changes none of it: the light stays as it
+                // is.
+                const next = terrainLight.blocks(t, [...deco].map(([key, d]) => [...key.split(',').map(Number), d.tile]));
+                const under = Array.from({ length: t.width * t.height }, (_, i) => groundOf(i % t.width, Math.floor(i / t.width)));
+                const changed = blocks && terrainLight.changes(blocks, next);
+                skyAt = terrainLight.sky(next, changed && { from: skyAt, changed: changed.filter(cell => cell[3]) });
+                if (changed) under.forEach((name, i) => { if (name !== grounds[i]) changed.push([i % t.width, -1, Math.floor(i / t.width), false]); });
+                blocks = next; grounds = under;
+                if (probes && !(baked && changed && !changed.length)) bake(changed);
             }
             let rebuilt = 0;
             t.chunks.forEach((chunk, i) => {
