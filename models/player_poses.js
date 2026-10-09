@@ -2,13 +2,15 @@
 // lives in core/player_anim.js. Angles in radians: rx > 0 tips a limb
 // backwards (a thigh) or bends it (a shin, or a hand towards the palm).
 const playerPoses = Object.freeze({
-    // Standing, sword forward and low, shield on the left forearm.
+    // Standing, sword forward and low, shield on the left forearm; both
+    // boots flat (user, 2026-10-09: the ankle turned back as far as the leg
+    // tips it).
     stance: {
         chest: { rx: 0.04 },
         upperArmR: { rx: -0.15, rz: -0.1 }, forearmR: { rx: -0.55 }, handR: { rx: 0.95, ry: -0.2 },
         upperArmL: { rx: -0.1, rz: 0.12 }, forearmL: { rx: -0.5 },
-        thighR: { rx: -0.08 }, shinR: { rx: 0.12 },
-        thighL: { rx: 0.1 }, shinL: { rx: 0.08 }
+        thighR: { rx: -0.08 }, shinR: { rx: 0.12 }, footR: { rx: -0.04 },
+        thighL: { rx: 0.1 }, shinL: { rx: 0.08 }, footL: { rx: -0.18 }
     },
     // A gait cycle is two steps: the keys of the right foot's step, evenly
     // spaced, then the same mirrored for the left. Key 0 is the right foot

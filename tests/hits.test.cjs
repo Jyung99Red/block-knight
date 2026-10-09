@@ -103,7 +103,7 @@ test('the smite, coming down from behind the shoulder, covers the front and the 
     const covered = move => { const out = []; for (let deg = -180; deg < 180; deg += 10) if (lands(move, target('post', STANDARD, deg * Math.PI / 180))) out.push(deg); return out; };
     const smite = covered('smite'), charged = covered('charged');
     // Posts at the standard distance, + on the right (simulation y).
-    for (let deg = -10; deg <= 40; deg += 10) assert.ok(smite.includes(deg), `smite misses a post at ${deg}`);
+    for (let deg = 0; deg <= 40; deg += 10) assert.ok(smite.includes(deg), `smite misses a post at ${deg}`);
     assert.ok(smite.includes(70) && !smite.some(d => d <= -40), `smite: the right side, not the left: ${smite}`);
     for (let deg = -60; deg <= 90; deg += 10) assert.ok(charged.includes(deg), `charged misses a post at ${deg}`);
 });

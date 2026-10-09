@@ -154,10 +154,11 @@ const playerMoves = (() => {
         // The legs under either guard: a squat for a steady centre, both
         // knees bent forward, the feet side by side and a little apart, both
         // down (the user's numbers from the move tuner, 2026-10-05; the right
-        // foot 0.008 blocks short of the ground, not seen). Standing, the
+        // foot 0.008 blocks short of the ground, not seen), the boots flat as
+        // standing (user, 2026-10-09). Standing, the
         // legs are guardLegs; walking, the stride goes on with guardBend
         // added, the knees kept bent.
-        guardLegs: { thighR: { rx: -0.45, ry: -0.1 }, shinR: { rx: 0.5 }, thighL: { rx: -0.5, ry: 0.15 }, shinL: { rx: 0.65 } },
+        guardLegs: { thighR: { rx: -0.45, ry: -0.1 }, shinR: { rx: 0.5 }, footR: { rx: -0.05 }, thighL: { rx: -0.5, ry: 0.15 }, shinL: { rx: 0.65 }, footL: { rx: -0.15 } },
         guardBend: { thighR: { rx: -0.2 }, shinR: { rx: 0.4 }, thighL: { rx: -0.2 }, shinL: { rx: 0.4 } },
         // Drinking a potion: the flask up to the mouth, the head tipped
         // back. Upper body only: legs keep walking underneath.
