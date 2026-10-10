@@ -8,8 +8,10 @@
 // A fight stops none of it (user, 2026-10-06: every limit taken out for
 // now; they may come back).
 //
-// In a mirror (core/sim.js) the hand goes out and a hold fills, but the
-// action itself is the host's to do.
+// Besides entities, a partner lying down in a shared adventure is a target
+// (fighterKit.offer: picked up, design.md 10). In a mirror (core/sim.js)
+// the hand goes out and a hold fills, but the action itself is the host's
+// to do.
 //
 // On a fighter: focus (the target's id, or null), using ({ id, t } while
 // a hold fills, else null), and the left hand reaching out to it: handOut
@@ -17,28 +19,33 @@
 // reach is the same for every interaction for now (user, 2026-10-04).
 const interactKit = (() => {
     const I = () => gameConfig.interact;
+    // The rules of a target: a fighter's, or its entity kit's.
+    const kitOf = e => combatKit.kitOf(e);
     function offerOf(sim, e, p) {
-        const kit = entityKit.kitOf(e);
-        return kit.offer && entityKit.present(e) ? kit.offer(sim, e, p) : null;
+        const kit = kitOf(e);
+        return kit.offer && (!kit.present || kit.present(e)) ? kit.offer(sim, e, p) : null;
     }
     // The best target for `p` now, or null.
     function pick(sim, p) {
         const S = I();
         let best = null, score = Infinity;
-        for (const e of sim.entities) {
+        const consider = e => {
             const held = e.id === p.focus, d = Math.hypot(e.x - p.x, e.y - p.y);
-            if (d > (held ? S.release : S.reach)) continue;
-            if (!offerOf(sim, e, p)) continue;
+            if (d > (held ? S.release : S.reach)) return;
+            if (!offerOf(sim, e, p)) return;
             const off = d > 1e-6 ? Math.abs(space.wrapAngle(Math.atan2(e.y - p.y, e.x - p.x) - p.facing)) : 0;
             const s = d + off * S.facingWeight - (held ? S.holdBonus : 0);
             if (s < score) { score = s; best = e; }
-        }
+        };
+        for (const e of sim.entities) consider(e);
+        for (const f of sim.fighters) if (f !== p) consider(f);
         return best;
     }
+    const byId = (sim, id) => entityKit.byId(sim, id) || sim.fighters.find(f => f.id === id) || null;
     // The current target and what it offers, for the screen: null or
     // { entity, offer, progress (0..1 of a hold under way) }.
     function target(sim, p) {
-        const e = p.focus ? entityKit.byId(sim, p.focus) : null, offer = e && offerOf(sim, e, p);
+        const e = p.focus ? byId(sim, p.focus) : null, offer = e && offerOf(sim, e, p);
         if (!offer) return null;
         const progress = p.using && p.using.id === e.id && offer.hold > 0 ? Math.min(1, p.using.t / offer.hold) : 0;
         return { entity: e, offer, progress };
@@ -48,7 +55,7 @@ const interactKit = (() => {
         if (!t || !t.offer.ready) return false;
         p.handFor = I().hand.stay;
         if (t.offer.hold > 0) { p.using = { id: t.entity.id, t: 0 }; return true; }
-        if (!sim.mirror) entityKit.kitOf(t.entity).use(sim, t.entity, p);
+        if (!sim.mirror) kitOf(t.entity).use(sim, t.entity, p);
         return true;
     }
     function release(sim, p) { p.using = null; }
@@ -63,7 +70,7 @@ const interactKit = (() => {
         const t = target(sim, p);
         if (!t || t.entity.id !== u.id || !t.offer.ready || !p.input.buttons.interact.held) { p.using = null; return; }
         u.t += dt;
-        if (u.t >= t.offer.hold - 1e-9) { p.using = null; p.handFor = H.stay; if (!sim.mirror) entityKit.kitOf(t.entity).use(sim, t.entity, p); }
+        if (u.t >= t.offer.hold - 1e-9) { p.using = null; p.handFor = H.stay; if (!sim.mirror) kitOf(t.entity).use(sim, t.entity, p); }
     }
     return { pick, target, press, release, tick };
 })();

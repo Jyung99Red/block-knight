@@ -11,10 +11,11 @@
 // the countdown, and an arrow at the edge of the screen while the rival is
 // in sight but off it. In a shared adventure (design.md 10): the room's
 // code (the host's, for the other phone to type), the partner's HP over
-// its head and the arrow to it, and a line while this one is down and the
-// partner is not, or while the world waits for the host. What is carried
-// (gold, potions) is this fighter's own (its bag, else the progress: as
-// core/props.js bagOf). Reads the simulation; never writes it.
+// its head and the arrow to it, a line while this one is down waiting to
+// be picked up or the world waits for the host, and one as it is picked
+// up. What is carried (gold, potions) is this fighter's own (its bag, else
+// the progress: as core/props.js bagOf). Reads the simulation; never
+// writes it.
 const hud = (() => {
     const FIGHTING = monsterKit.FIGHTING;
     // What a world with nothing carried shows (a duel).
@@ -61,10 +62,10 @@ const hud = (() => {
         const nameOf = body => body.kind === 'fighter' ? '对手' : body.kind === 'dummy' ? gameConfig.dummy.name : gameConfig.monsters[body.kind].name;
         const topOf = body => body.kind === 'fighter' ? 2.15 : body.kind === 'dummy' ? 1.95 : monsterKit.height(body.kind) + 0.25;
         // Where a target's tag floats, in blocks above its spot.
-        const TAG = { building: 2.7, portal: 3.6, chest: 1.2, grave: 1.6 };
+        const TAG = { building: 2.7, portal: 3.6, chest: 1.2, grave: 1.6, fighter: 1.2 };
         // Where the ring of a hold under way sits, in blocks above the
         // target's spot: about the top of it.
-        const HOLD = { chest: 0.75, grave: 1.1, ore: 1.05, crystal: 1.1, herb: 0.45 };
+        const HOLD = { chest: 0.75, grave: 1.1, ore: 1.05, crystal: 1.1, herb: 0.45, fighter: 0.6 };
         // A line in the middle of the screen for `seconds`: the region
         // entered, a boss down.
         function announce(title, note, seconds, now) {
@@ -157,8 +158,9 @@ const hud = (() => {
             els.tagName.textContent = t.offer.name;
             els.tagWhy.textContent = t.offer.ready ? '' : t.offer.why;
             const e = t.entity, at = space.toBlocks(e.x, e.y, e.h);
-            const ring = [at[0], at[1] + (HOLD[e.type === 'node' ? e.kind : e.type] ?? 0.8), at[2]];
-            at[1] += TAG[e.type] ?? 1.5;
+            const sort = e.type === 'node' || e.kind === 'fighter' ? e.kind : e.type;
+            const ring = [at[0], at[1] + (HOLD[sort] ?? 0.8), at[2]];
+            at[1] += TAG[sort] ?? 1.5;
             els.tag.hidden = !place(els.tag, view, at);
             if (t.progress > 0) {
                 const xy = view?.project(ring);
@@ -261,7 +263,7 @@ const hud = (() => {
             // held for a phone in the background, who it waits for.
             // In a shared adventure: who it waits for, or this one down while the partner is not.
             const waits = coop?.entering ? '正在进入房主的世界…' : coop?.waiting === 'peer' && coop.role === 'guest' ? '房主暂时离开，等待中…'
-                : coop && p.down && !sim.result ? '倒下了，等同伴' : '';
+                : coop && p.down && !sim.result ? '倒下了，等同伴来救' : '';
             els.banner.classList.toggle('note', duel?.phase === 'hold' || !!waits);
             if (waits) { els.banner.hidden = false; els.banner.textContent = waits; }
             else if (duel && duel.phase === 'hold') {
@@ -324,6 +326,7 @@ const hud = (() => {
                 }
                 if (e.type === 'revive') announce(`${e.name}复活了`, '再打倒它，还会掉它的素材', 2.5, now);
                 if (e.type === 'rest' && e.side === selfId) announce('生命回满了', '', 1.6, now);
+                if (e.type === 'rescued' && (e.side === selfId || e.by === selfId)) announce(e.side === selfId ? '同伴把你救起来了' : '救起了同伴', '', 1.6, now);
                 // Whoever this fighter last traded blows with stays in the panel.
                 if (e.type === 'hit' || e.type === 'parry' || e.type === 'block') {
                     const other = e.target === selfId || e.type === 'block' ? e.source : e.target;

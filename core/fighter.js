@@ -33,6 +33,7 @@
 //          it is still telling, then 'a' or 'b'), free (nothing has stood in
 //          the way of a move since the press) }
 //   down, downT  fallen (HP emptied where nobody is `endless`), and since when
+//   rising seconds still getting up, picked up by a partner (design.md 10)
 //   focus, using  the interact key's target and a hold under way (core/interact.js)
 //   handOut, handFor  the left hand reaching out to interact (core/interact.js)
 //   drink  a potion: null, or { phase: wait (pressed while busy) | drink, t }
@@ -61,7 +62,7 @@ const fighterKit = (() => {
             id, side: id, kind: 'fighter', hp: stats.maxHp, maxHp: stats.maxHp, atk: stats.atk, def: stats.def, endless,
             input: { move: { x: 0, y: 0 }, buttons },
             stats: { attacks: 0, hits: 0, misses: 0, blocks: 0, parries: 0, hurt: 0, kills: 0 },
-            act: null, chain: null, buffer: null, combo: [], stun: 0, freeze: 0, push: null, press: null, down: false, downT: 0, focus: null, using: null, handOut: 0, handFor: 0, drink: null, lit: false, reveal: 0,
+            act: null, chain: null, buffer: null, combo: [], stun: 0, freeze: 0, push: null, press: null, down: false, downT: 0, rising: 0, focus: null, using: null, handOut: 0, handFor: 0, drink: null, lit: false, reveal: 0,
             guard: { state: 'down', t: 0, readyAt: -1, bar: F().guardBar.max, locked: false, queued: false }, guardBlend: 0, shoveOut: 0, shoveFor: 0
         });
     }
@@ -386,7 +387,7 @@ const fighterKit = (() => {
     // The HP bar emptied where the fighter can lose: down for good.
     function fall(sim, p) {
         if (p.down) return;
-        Object.assign(p, { down: true, downT: 0, act: null, chain: null, combo: [], buffer: null, press: null, stun: 0, push: null, speed: 0, pace: 0, runBlend: 0, moveTime: 0, focus: null, using: null, handOut: 0, handFor: 0, drink: null, shoveOut: 0, shoveFor: 0 });
+        Object.assign(p, { down: true, downT: 0, rising: 0, act: null, chain: null, combo: [], buffer: null, press: null, stun: 0, push: null, speed: 0, pace: 0, runBlend: 0, moveTime: 0, focus: null, using: null, handOut: 0, handFor: 0, drink: null, shoveOut: 0, shoveFor: 0 });
         p.guard.state = 'down'; p.guard.queued = false;
         emit(sim, p, 'down');
     }
@@ -402,8 +403,25 @@ const fighterKit = (() => {
         if (p.guard.state !== 'down') p.guard.state = 'down';
         // Still holding the guard key: it goes back up once the stun is over.
         p.guard.queued = p.input.buttons.guard.held && !p.guard.locked;
-        p.stun = F().hitStun;
+        // (Getting up is not cut short.)
+        p.stun = Math.max(p.stun, F().hitStun);
         p.runBlend = 0; p.moveTime = 0;
+    }
+
+    // ---- a partner down (design.md 10; user, 2026-10-10) ----
+    // In a shared adventure a fallen fighter waits for the other: holding
+    // the interact key over it for coop.reviveHold seconds picks it up
+    // with coop.reviveHp of its HP. It gets up over coop.riseSeconds,
+    // standing still meanwhile (as stunned). Not in a duel, nor alone.
+    function offer(sim, f, p) {
+        if (sim.duel || f === p || !f.down || sim.result) return null;
+        return { verb: '救起', name: '同伴', hold: gameConfig.coop.reviveHold, ready: true, why: '' };
+    }
+    function use(sim, f, p) {
+        if (!f.down) return;
+        const R = gameConfig.coop;
+        Object.assign(f, { down: false, downT: 0, hp: Math.max(1, Math.round(f.maxHp * R.reviveHp)), stun: R.riseSeconds, rising: R.riseSeconds });
+        emit(sim, f, 'rescued', { by: p.id, at: space.toBlocks(f.x, f.y, 30) });
     }
 
     // ---- moving ----
@@ -466,6 +484,7 @@ const fighterKit = (() => {
         if (b && (b.age += dt) > K().bufferSeconds + 1e-9 && !(b.input === 'b' && p.press?.held && p.press.at === b.at)) p.buffer = null;
         if (p.push) combatKit.tickPush(sim, p, dt, obstacles(sim, p));
         if (p.stun > 0) p.stun = Math.max(0, p.stun - dt);
+        if (p.rising > 0) p.rising = Math.max(0, p.rising - dt);
         // The attack key held long enough is a B.
         const k = p.press;
         if (k && !k.as) {
@@ -532,5 +551,5 @@ const fighterKit = (() => {
             }
         }
     }
-    return { BUTTONS, init, press, release, tick, settle, struck, fall, foes, solve, hurtboxes, derive, chargeOf, rigOf, light, hidden, ITEMS };
+    return { BUTTONS, init, press, release, tick, settle, struck, fall, offer, use, foes, solve, hurtboxes, derive, chargeOf, rigOf, light, hidden, ITEMS };
 })();

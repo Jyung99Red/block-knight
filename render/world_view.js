@@ -389,11 +389,15 @@ const worldView = (() => {
             const picture = view ? null : pictureOf(pitch);
             const look = view ? null : space.holdCamera([at[0], at[2]], yaw, picture, { reach: roam, edge: C.camera.edge, far: FAR });
             // What this fighter does not see is not drawn: a rival, a
-            // monster or the dummy behind its back or behind a wall. The
-            // title screen's camera is not the fighter's: everything is
-            // drawn, and the bodies near what it looks at.
+            // monster or the dummy behind its back or behind a wall. In a
+            // shared adventure what the partner sees is seen too (user,
+            // 2026-10-10: their sight is shared, design.md 10), and the
+            // partner itself always. The title screen's camera is not the
+            // fighter's: everything is drawn, and the bodies near what it
+            // looks at.
             const seeing = dayKit.sight(dayKit.hourOf(current, tune.hourShift));
-            const inSight = view ? () => true : body => combatKit.sees(current.terrain, me, body, seeing);
+            const eyes = [me, ...(current.duel ? [] : current.fighters.filter(f => f.id !== selfId).map(shownOf))];
+            const inSight = view ? () => true : body => eyes.some(e => combatKit.sees(current.terrain, e, body, seeing));
             seen.clear();
             const drawn = [];
             for (const f of current.fighters) {
@@ -449,7 +453,7 @@ const worldView = (() => {
             ground.update([focus[0], focus[2]]);
             effects.onEvents(events, selfId);
             effects.update(frameSeconds, current, { selfId, fighters: drawn, foes });
-            sight.update(at[0], at[2], me.facing, seeing);
+            sight.update(at[0], at[2], me.facing, seeing, eyes.slice(1).map(e => { const [x, , z] = space.toBlocks(e.x, e.y); return { x, z, facing: e.facing }; }));
             sight.show(!view);
             if (view) {
                 camera.position.fromArray(view.eye);

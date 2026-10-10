@@ -1,6 +1,8 @@
 // The shade of sight for the world view (render/world_view.js): what this
-// phone's fighter cannot see is shaded on the terrain. Drawing only: what
-// is seen is decided by the simulation (core/terrain.js `sightFan`).
+// phone's fighter cannot see is shaded on the terrain -- in a shared
+// adventure, what neither player sees (user, 2026-10-10: they share their
+// sight, design.md 10). Drawing only: what is seen is decided by the
+// simulation (core/terrain.js `sightFan`).
 const viewSight = (() => {
     // The shade's colour and how far it goes (game_config.js graphics.shade).
     const SHADE = gameConfig.graphics.shade;
@@ -33,15 +35,22 @@ void main() {
             let pos = null;
             const fanMesh = new T.Mesh(geo, new T.MeshBasicMaterial({ color: '#ffffff', side: T.DoubleSide, fog: false }));
             fanMesh.frustumCulled = false;
+            // Others' sight, cleared out of the shade: from each one's eye
+            // to where its rays end (drawn over the fan, black).
+            const seenGeo = new T.BufferGeometry();
+            let seenPos = null;
+            const seenMesh = new T.Mesh(seenGeo, new T.MeshBasicMaterial({ color: '#000000', side: T.DoubleSide, fog: false }));
+            seenMesh.frustumCulled = false; seenMesh.renderOrder = 1; seenMesh.visible = false;
             const above = new T.Scene(), eye = new T.OrthographicCamera(-half, half, half, -half, 0, 10);
-            above.background = new T.Color('#000000'); above.add(fanMesh);
+            above.background = new T.Color('#000000'); above.add(fanMesh, seenMesh);
             eye.up.set(0, 0, -1); eye.position.set(0, 5, 0); eye.lookAt(0, 0, 0);
             const target = samples => new T.WebGLRenderTarget(size, size, { depthBuffer: false, samples });
             const drawnMask = target(4), blurred = [target(0), target(0)];
             const steps = [[drawnMask, eye, above, null], [blurred[0], flat, pass, [BLUR / size, 0, drawnMask]], [blurred[1], flat, pass, [0, BLUR / size, blurred[0]]]];
             // The fan round (x, z), blocks: between each ray and the next,
-            // from where it ends out past the texture's edge.
-            function draw(x, z, fan) {
+            // from where it ends out past the texture's edge. `others`:
+            // the fans of other eyes ({ x, z, fan }), whose sight is cleared.
+            function draw(x, z, fan, others = []) {
                 const n = fan.n;
                 if (!pos || pos.length < fan.angle.length * 18) {
                     geo.dispose();
@@ -58,6 +67,26 @@ void main() {
                 }
                 geo.setDrawRange(0, n * 6);
                 geo.attributes.position.needsUpdate = true;
+                const most = others.reduce((sum, o) => sum + o.fan.n, 0);
+                seenMesh.visible = most > 0;
+                if (most > 0) {
+                    if (!seenPos || seenPos.length < most * 9) {
+                        seenGeo.dispose();
+                        seenPos = new Float32Array(most * 9);
+                        seenGeo.setAttribute('position', new T.BufferAttribute(seenPos, 3));
+                    }
+                    let o = 0;
+                    for (const { x: ox, z: oz, fan: f } of others) {
+                        for (let i = 0; i < f.n; i++) {
+                            const j = (i + 1) % f.n, d0 = f.reach[i] / U, d1 = f.reach[j] / U;
+                            seenPos[o++] = ox; seenPos[o++] = 0; seenPos[o++] = oz;
+                            seenPos[o++] = ox + Math.cos(f.angle[i]) * d0; seenPos[o++] = 0; seenPos[o++] = oz + Math.sin(f.angle[i]) * d0;
+                            seenPos[o++] = ox + Math.cos(f.angle[j]) * d1; seenPos[o++] = 0; seenPos[o++] = oz + Math.sin(f.angle[j]) * d1;
+                        }
+                    }
+                    seenGeo.setDrawRange(0, most * 3);
+                    seenGeo.attributes.position.needsUpdate = true;
+                }
                 eye.position.set(x, 5, z);
                 for (const [to, cam, what, from] of steps) {
                     if (from) { blur.uniforms.along.value.set(from[0], from[1]); blur.uniforms.map.value = from[2].texture; }
@@ -65,7 +94,7 @@ void main() {
                 }
                 renderer.setRenderTarget(null);
             }
-            const mask = { texture: blurred[1].texture, half, out, draw, dispose() { geo.dispose(); fanMesh.material.dispose(); for (const one of [drawnMask, ...blurred]) one.dispose(); } };
+            const mask = { texture: blurred[1].texture, half, out, draw, dispose() { geo.dispose(); fanMesh.material.dispose(); seenGeo.dispose(); seenMesh.material.dispose(); for (const one of [drawnMask, ...blurred]) one.dispose(); } };
             masks.push(mask);
             return mask;
         }
@@ -92,16 +121,24 @@ void main() {
         const mask = fanMask(MASK, SIGHT_FAR), fan = { n: 0, angle: new Float64Array(0), reach: new Float64Array(0) };
         ground.sight.mask.value = mask.texture; ground.sight.at.value.set(0, 0, mask.half);
         ground.sight.tone.value.set(...SHADE.color.map(v => v / 255), SHADE.opacity);
-        let lastX = NaN, lastZ = NaN, lastFacing = NaN, lastRev = -1, lastAngle = NaN, lastNear = NaN;
-        // Recast only when the fighter has moved or turned, what it sees
-        // (`seen`: { angle, near }, the hour's: dayKit.sight) has changed,
-        // or the terrain has.
-        function update(x, z, facing, seen) {
-            if (x === lastX && z === lastZ && facing === lastFacing && lastRev === t.rev && seen.angle === lastAngle && seen.near === lastNear) return;
-            lastX = x; lastZ = z; lastFacing = facing; lastRev = t.rev; lastAngle = seen.angle; lastNear = seen.near;
+        let lastX = NaN, lastZ = NaN, lastFacing = NaN, lastRev = -1, lastAngle = NaN, lastNear = NaN, lastOthers = '';
+        const otherFans = [];
+        // Recast only when the fighter (or a partner sharing its sight:
+        // `others`, [{ x, z, facing }] in blocks) has moved or turned, what
+        // it sees (`seen`: { angle, near }, the hour's: dayKit.sight) has
+        // changed, or the terrain has.
+        function update(x, z, facing, seen, others = []) {
+            const key = others.map(o => `${o.x},${o.z},${o.facing}`).join(';');
+            if (x === lastX && z === lastZ && facing === lastFacing && lastRev === t.rev && seen.angle === lastAngle && seen.near === lastNear && key === lastOthers) return;
+            lastX = x; lastZ = z; lastFacing = facing; lastRev = t.rev; lastAngle = seen.angle; lastNear = seen.near; lastOthers = key;
             terrainKit.sightFan(t, x * U, z * U, SIGHT_FAR * U, { facing, half: seen.angle, near: seen.near, out: fan });
+            others.forEach((o, i) => {
+                const of = otherFans[i] || (otherFans[i] = { x: 0, z: 0, fan: { n: 0, angle: new Float64Array(0), reach: new Float64Array(0) } });
+                of.x = o.x; of.z = o.z;
+                terrainKit.sightFan(t, o.x * U, o.z * U, SIGHT_FAR * U, { facing: o.facing, half: seen.angle, near: seen.near, out: of.fan });
+            });
             ground.sight.at.value.set(x, z, mask.half);
-            mask.draw(x, z, fan);
+            mask.draw(x, z, fan, otherFans.slice(0, others.length));
         }
         // Shaded or not (not under the title screen's camera: drawing only).
         function show(on) { ground.sight.tone.value.w = on ? SHADE.opacity : 0; }

@@ -310,8 +310,8 @@ const playerAnim = (() => {
         return k - given * (1 - k);
     }
     // The judged pose. `body` needs { gait, moveBlend, runBlend }, and for a
-    // fighter { act, guardBlend, shoveOut, shoveFor, stun, down, downT, drink,
-    // handOut, loadout }.
+    // fighter { act, guardBlend, shoveOut, shoveFor, stun, down, downT, rising,
+    // drink, handOut, loadout }.
     function pose(rig, body) {
         let pose = locomotion(rig, body), stepping = 1, standing = false;
         const act = body.act, lowerBody = playerModel.layers.lower, rest = restOf(body.loadout);
@@ -355,7 +355,10 @@ const playerAnim = (() => {
             pose = rigKit.mix(pose, { ...rigKit.pick(pose, lowerBody), ...playerMoves.drink }, smooth(k));
         }
         if (body.down) { pose = rigKit.mix(pose, playerMoves.down, easeOut(clamp01(body.downT / 0.5))); stepping = 0; }
-        if (body.stun > 0) {
+        // Picked up by a partner: from lying down back on its feet (design.md 10).
+        const rising = clamp01((body.rising || 0) / gameConfig.coop.riseSeconds);
+        if (rising > 0) { pose = rigKit.mix(pose, playerMoves.down, smooth(rising)); stepping = 0; }
+        else if (body.stun > 0) {
             // Thrown back over the first fifth of the stun, then easing back.
             const left = clamp01(body.stun / gameConfig.combat.hitStun), k = left > 0.8 ? (1 - left) / 0.2 : left / 0.8;
             pose = rigKit.add(pose, rigKit.scale(playerMoves.flinch, k));

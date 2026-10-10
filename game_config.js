@@ -1088,7 +1088,10 @@ const gameConfig = (() => {
         // players. snapshotSeconds: host to guest state (the whole world's,
         // so less often than a duel's); beside: how far from the host
         // (world units) someone joining, or travelling along, stands. The
-        // rest of the network's timing is the duel's (pvp).
-        coop: { snapshotSeconds: 0.1, beside: 48 }
+        // rest of the network's timing is the duel's (pvp). A partner down
+        // is picked up by holding the interact key over it reviveHold
+        // seconds (user, 2026-10-10), with reviveHp of its HP (user), and
+        // gets up over riseSeconds.
+        coop: { snapshotSeconds: 0.1, beside: 48, reviveHold: 3, reviveHp: 0.1, riseSeconds: 0.8 }
     });
 })();

@@ -1,13 +1,13 @@
 // A shared adventure (design.md 10): two players in one world -- a guest
 // joining and leaving it, its own bag, partners who do not hurt each
-// other, monsters going for the nearer one, a trip that ends only when
-// everyone has fallen -- and the host/guest protocol of core/coop.js
+// other, monsters going for the nearer one, a partner down picked up by
+// the other, a trip that ends only when everyone has fallen -- and the host/guest protocol of core/coop.js
 // played end to end over an in-memory channel, the host's page played as
 // ui/app.js plays it.
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const { load } = require('./load.cjs');
-const { worldSim: W, coopKit, simLoop, saveKit, propKit, terrainKit, inventoryKit, space, gameConfig } = load();
+const { worldSim: W, coopKit, simLoop, saveKit, propKit, terrainKit, inventoryKit, interactKit, fighterKit, space, gameConfig } = load();
 const GUEST = coopKit.GUEST, U = gameConfig.world.unitsPerBlock, PV = gameConfig.pvp;
 // The M3 field, fixed for these tests (the game's regions change with content).
 const FIELD = require('./fixtures/m3-field.cjs');
@@ -82,6 +82,41 @@ test('a trip ends when the last one standing falls, not before', () => {
     g.hp = 0; g.down = true;
     step(sim, 0.02);
     assert.equal(sim.result?.outcome, 'lose');
+});
+
+test('a partner down waits to be picked up: the interact key held over it coop.reviveHold seconds stands it up with coop.reviveHp of its HP', () => {
+    const sim = W.create({ map: FIELD }), p = sim.player, g = W.join(sim, { id: GUEST, loadout: gameConfig.gear.starter, bag: bagOf() }), C = gameConfig.coop;
+    for (const m of sim.monsters) Object.assign(m, { x: 100, y: 100, home: { x: 100, y: 100 } });
+    Object.assign(p, { x: 600, y: 300, facing: 0 }); Object.assign(g, { x: 640, y: 300 });
+    assert.equal(interactKit.target(sim, p), null, 'nothing to do for one standing');
+    g.hp = 0; fighterKit.fall(sim, g);
+    step(sim, 0.05);
+    const t = interactKit.target(sim, p);
+    assert.equal(t?.entity, g); assert.equal(t.offer.hold, C.reviveHold); assert.equal(t.offer.ready, true);
+    // Let go too soon: still down.
+    W.command(sim, { type: 'press', button: 'interact' });
+    step(sim, C.reviveHold - 0.2);
+    W.command(sim, { type: 'release', button: 'interact' });
+    step(sim, 0.3);
+    assert.equal(g.down, true);
+    W.command(sim, { type: 'press', button: 'interact' });
+    step(sim, C.reviveHold + 0.02);
+    W.command(sim, { type: 'release', button: 'interact' });
+    assert.equal(g.down, false);
+    assert.equal(g.hp, Math.max(1, Math.round(g.maxHp * C.reviveHp)));
+    assert.ok(W.drain(sim).some(e => e.type === 'rescued' && e.side === GUEST && e.by === 'player'));
+    // It gets up first, standing still.
+    const x0 = g.x;
+    W.command(sim, { type: 'move', x: 1, y: 0 }, 1);
+    step(sim, C.riseSeconds / 2);
+    assert.ok(g.rising > 0 && g.x === x0);
+    step(sim, C.riseSeconds / 2 + 0.3);
+    assert.equal(g.rising, 0); assert.ok(g.x > x0);
+    // Alone, or in a duel, there is nobody to pick up.
+    const duel = W.create({ map: gameConfig.maps.arena, duel: true }), [h, r] = duel.fighters;
+    Object.assign(h, { x: 400, y: 300, facing: 0 }); Object.assign(r, { x: 430, y: 300 });
+    r.hp = 0; fighterKit.fall(duel, r);
+    assert.equal(fighterKit.offer(duel, r, h), null);
 });
 
 test('what a guest picks up and drinks is its own bag\'s; a chest it opens is the world\'s', () => {
@@ -270,6 +305,23 @@ test('a portal the guest takes takes both; it arrives with the host, in a new wo
     assert.equal(p.gs.sim.region, portal.to);
     const [h, me] = p.gs.sim.fighters;
     assert.ok(Math.hypot(h.x - me.x, h.y - me.y) < gameConfig.coop.beside + 1, 'beside the host');
+});
+
+test('the guest picks the host up: decided on the host, seen on both', () => {
+    const p = party();
+    p.run(0.3);
+    const host = p.host.sim.player, g = theirs(p);
+    Object.assign(g, { x: host.x - 40, y: host.y, facing: 0 });
+    host.hp = 0; fighterKit.fall(p.host.sim, host);
+    p.run(0.3);
+    assert.equal(p.gs.sim.fighters[0].down, true);
+    p.gs.command({ type: 'press', button: 'interact' });
+    p.run(gameConfig.coop.reviveHold + 0.3);
+    p.gs.command({ type: 'release', button: 'interact' });
+    p.run(0.3);
+    assert.equal(host.down, false);
+    assert.equal(p.gs.sim.fighters[0].down, false);
+    assert.ok(p.log.shown.some(e => e.type === 'rescued' && e.side === 'player' && e.by === GUEST));
 });
 
 test('the guest trades through the host, on its own bag', () => {
