@@ -24,9 +24,12 @@
 // is let in and whenever the host's world is built anew (the party went
 // through a portal, everyone fell, ...); host snap { visit, serial, ack,
 // stamp, wait, state, events, ground? } every coop.snapshotSeconds
-// (`ground`: the terrain's changes, whenever they change); guest input
-// { seq, cmd } and trade { op, id, n }; either way beat, away / back (a
-// phone in the background) and leave. As in a duel the guest numbers its
+// (`ground`: the terrain's changes, whenever they change); both carry
+// `mate`, where the host is when not in the guest's world ({ region } or
+// null: each goes its own way, user 2026-10-10). Guest input { seq, cmd },
+// trade { op, id, n } and giveup (down, it stops waiting to be picked up
+// and goes back to the base); either way beat, away / back (a phone in the
+// background) and leave. As in a duel the guest numbers its
 // inputs and beats (`stamp`) and a snapshot names the last one had and
 // how long ago (`wait`), which times the way there and back.
 // A snapshot leaves out what never changes once placed (buildings,
@@ -121,7 +124,9 @@ const coopKit = (() => {
     function mirror(msg) {
         const s = msg.state;
         if (!obj(msg.progress) || !obj(s) || !Array.isArray(s.fighters) || !obj(s.fighters[0]) || !gameConfig.maps[msg.region] || gameConfig.maps[msg.region].duel) throw new Error('Not a world');
-        const sim = worldSim.create({ region: msg.region, progress: msg.progress, loadout: s.fighters[0].loadout, seed: s.seed });
+        // (The first may be the guest itself, in a region of its own.)
+        const first = s.fighters[0].id;
+        const sim = worldSim.create({ region: msg.region, progress: msg.progress, loadout: s.fighters[0].loadout, seed: s.seed, self: first, bag: s.bags?.[first] || null });
         for (const f of s.fighters.slice(1)) worldSim.join(sim, { id: f.id, loadout: f.loadout, bag: s.bags?.[f.id] || null, spot: f });
         sim.mirror = true;
         if (!validState(sim, s)) throw new Error('Not a world');
@@ -130,14 +135,17 @@ const coopKit = (() => {
     }
 
     // ---- the host's end ----
-    // world(): the host's world now (its page builds it anew as the party
-    // travels). on (all optional): join({ loadout, bag }) a guest is let
-    // in: put its fighter in the world now (worldSim.join, id GUEST, with
-    // that very bag, which this end keeps across worlds); part(reason) the
-    // guest is gone ('left' | 'timeout' | 'away' (in the background too
-    // long) | 'lost' (the channel closed) | 'incompatible'): take its
-    // fighter out. The room stays open for the next one.
-    function host({ send, now, world, on = {} }) {
+    // world(): the guest's world now -- the host's, or a region of its own
+    // the host's phone runs as well (the page builds them anew as each
+    // travels); mate(): where the host is when not there ({ region }) or
+    // null. on (all optional): join({ loadout, bag }) a guest is let in:
+    // put its fighter in the world now (worldSim.join, id GUEST, with that
+    // very bag, which this end keeps across worlds); part(reason) the guest
+    // is gone ('left' | 'timeout' | 'away' (in the background too long) |
+    // 'lost' (the channel closed) | 'incompatible'): take its fighter out;
+    // giveUp() the guest, down, goes back to the base. The room stays open
+    // for the next one.
+    function host({ send, now, world, mate = () => null, on = {} }) {
         // guest: { seq (last input had), heard, away, awaySince, stamp,
         // stampAt (the last stamp had, and when), bag }, or null.
         let guest = null, eventId = 0, history = [], serial = 0, visit = 0, ground = -1, lastSnap = -Infinity, lastSent = -Infinity, selfAway = false, frameAt = now();
@@ -155,12 +163,12 @@ const coopKit = (() => {
             if (!guest) return;
             const sim = world();
             visit++; history = []; ground = sim.terrain.rev; lastSnap = now();
-            post({ t: 'world', visit, ...worldOf(sim), state: stateOf(sim) });
+            post({ t: 'world', visit, ...worldOf(sim), state: stateOf(sim), mate: mate() });
         }
         function snapshot() {
             const sim = world(), t = now();
             lastSnap = t;
-            const msg = { t: 'snap', visit, serial: ++serial, ack: guest.seq, stamp: guest.stamp, wait: Math.max(0, t - guest.stampAt), state: stateOf(sim), events: history };
+            const msg = { t: 'snap', visit, serial: ++serial, ack: guest.seq, stamp: guest.stamp, wait: Math.max(0, t - guest.stampAt), state: stateOf(sim), events: history, mate: mate() };
             if (sim.terrain.rev !== ground) { ground = sim.terrain.rev; msg.ground = changes(sim.terrain); }
             post(msg);
         }
@@ -185,7 +193,8 @@ const coopKit = (() => {
                 guest.seq = msg.seq;
                 const sim = world(), i = index(sim);
                 if (i >= 0) worldSim.command(sim, msg.cmd, i);
-            } else if (msg.t === 'trade' && Object.hasOwn(TRADES, msg.op) && typeof msg.id === 'string') {
+            } else if (msg.t === 'giveup') on.giveUp?.();
+            else if (msg.t === 'trade' && Object.hasOwn(TRADES, msg.op) && typeof msg.id === 'string') {
                 TRADES[msg.op](guest.bag, msg.id, msg.n === 'all' ? Infinity : Number(msg.n) || 1);
             }
         }
@@ -240,8 +249,10 @@ const coopKit = (() => {
     // 'away' (the host in the background too long) | 'closed' (this phone
     // left): over for good.
     function guest({ send, now, bag, on = {} }) {
-        let phase = 'hello', sim = null, visit = 0, endReason = null, peerOk = false;
+        // `mate`: where the host is when not in this world ({ region }), or null.
+        let phase = 'hello', sim = null, visit = 0, endReason = null, peerOk = false, mate = null;
         let lastHeard = now(), lastSent = -Infinity, hostAway = false, awaySince = 0, selfAway = false;
+        const mateOf = m => obj(m) && Object.hasOwn(gameConfig.maps, m.region) ? { region: m.region } : null;
         // `latency` one way, from `timed` samples (`stamps`: when each
         // numbered message left); `frameAt` when the last frame ran;
         // `synced` once its time follows the snapshots.
@@ -288,7 +299,7 @@ const coopKit = (() => {
             if (!count(msg.visit) || msg.visit <= visit) return;
             let next;
             try { next = mirror(msg); } catch (_) { end('incompatible', 'leave'); return; }
-            visit = msg.visit; sim = next; phase = 'playing';
+            visit = msg.visit; sim = next; phase = 'playing'; mate = mateOf(msg.mate);
             applied = -1; synced = false; offsets = new Map();
             loop.reset(); remember();
             on.start?.(sim);
@@ -297,7 +308,7 @@ const coopKit = (() => {
             if (msg.visit !== visit || !Number.isSafeInteger(msg.serial) || msg.serial <= applied || !count(msg.ack) || msg.ack > inputSeq ||
                 !count(msg.stamp) || msg.stamp > stamp || !num(msg.wait) || msg.wait < 0 || !Array.isArray(msg.events) ||
                 (msg.ground !== undefined && !validGround(msg.ground)) || !validState(sim, msg.state)) return;
-            applied = msg.serial;
+            applied = msg.serial; mate = mateOf(msg.mate);
             const at = now();
             if (stamps.has(msg.stamp)) {
                 // There and back, less the time the host kept it before
@@ -396,6 +407,8 @@ const coopKit = (() => {
             get bag() { return sim?.bags[GUEST] || null; },
             // Who the world waits for: the host in the background, or nobody.
             get waiting() { return hostAway ? 'peer' : null; },
+            // Where the host is when not in this world: { region }, or null.
+            get mate() { return mate; },
             // The channel is open: introduce this phone and what it brings.
             open() { lastHeard = now(); post({ t: 'hello', protocol: PROTOCOL, rules: rules(), bag }); },
             receive, command, frame,
@@ -420,6 +433,8 @@ const coopKit = (() => {
                 post({ t: selfAway ? 'away' : 'back' });
             },
             pulse() { if (phase !== 'ended' && now() - lastSent >= P().heartbeatSeconds) post({ t: 'beat', ack: seenEvent }); },
+            // Down, it stops waiting to be picked up: the host sends it back to the base.
+            giveUp() { if (phase === 'playing') post({ t: 'giveup' }); },
             // Leaving the host's world for good.
             leave() { end('closed', 'leave'); },
             // The channel itself is gone.

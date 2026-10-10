@@ -49,7 +49,7 @@ const hud = (() => {
             floats: $('[data-hud="floats"]'), mobs: $('[data-hud="mobs"]'), banner: $('[data-hud="banner"]'), arrow: $('[data-hud="arrow"]'),
             boss: $('[data-hud="boss"]'), key: $('[data-button="interact"]'), keyText: $('[data-hud="interact"]'),
             tag: $('[data-hud="tag"]'), hold: $('[data-hud="hold"]'), tagName: $('[data-hud="tag-name"]'), tagWhy: $('[data-hud="tag-why"]'), toasts: $('[data-hud="toasts"]'),
-            room: $('[data-hud="room"]'), region: $('[data-hud="region"]'), regionTitle: $('[data-hud="region-title"]'), regionNote: $('[data-hud="region-note"]'),
+            room: $('[data-hud="room"]'), giveUp: $('[data-giveup]'), region: $('[data-hud="region"]'), regionTitle: $('[data-hud="region-title"]'), regionNote: $('[data-hud="region-note"]'),
             guardKey: $('[data-button="guard"]'), offhand: $('[data-button="offhand"]'), offhandCount: $('[data-hud="offhand-count"]'),
             clock: $('[data-hud="clock"]'), clockRing: $('[data-hud="clock-ring"]'), clockHand: $('[data-hud="clock-hand"]')
         };
@@ -173,8 +173,9 @@ const hud = (() => {
         }
         // duel (optional): { countdown, phase, waiting } from the duel
         // session. coop (optional): { role: 'host' | 'guest', code, partner
-        // (someone else is in the world), waiting ('peer': the host is in
-        // the background), entering (the host's world not here yet) }.
+        // (someone else is in the world), elsewhere (the region the partner
+        // is in, when another), waiting ('peer': the host is in the
+        // background), entering (the host's world not here yet) }.
         function update(sim, view, now, bodies = null, { self = 'player', duel = null, coop = null } = {}) {
             selfId = self;
             const p = sim.fighters.find(f => f.id === self) || sim.fighters[0], G = gameConfig.combat.guardBar;
@@ -198,7 +199,10 @@ const hud = (() => {
             els.goal.hidden = !!sim.duel || !map;
             if (!els.goal.hidden) els.goal.textContent = map.training ? map.name : `${map.name} · ${gameConfig.items.gold.icon} ${bag.inventory.gold}`;
             els.room.hidden = !coop;
-            if (coop) els.room.textContent = coop.role === 'host' ? `房间 ${coop.code} · ${coop.partner ? '同伴在这里' : '等人加入'}` : `联机 · 房间 ${coop.code}`;
+            if (coop) {
+                const there = coop.elsewhere ? gameConfig.maps[coop.elsewhere].name : '';
+                els.room.textContent = coop.role === 'host' ? `房间 ${coop.code} · ${there ? `同伴在${there}` : coop.partner ? '同伴在这里' : '等人加入'}` : `联机 · 房间 ${coop.code}${there ? ` · 房主在${there}` : ''}`;
+            }
             // The clock: the hour the world is drawn at, to a quarter of a
             // degree; the sun or the moon, whichever is up.
             const hour = view?.hour ? view.hour(sim) : dayKit.hourOf(sim), turn = Math.round(dialAngle(hour) * 4) / 4;
@@ -265,6 +269,7 @@ const hud = (() => {
             const waits = coop?.entering ? '正在进入房主的世界…' : coop?.waiting === 'peer' && coop.role === 'guest' ? '房主暂时离开，等待中…'
                 : coop && p.down && !sim.result ? '倒下了，等同伴来救' : '';
             els.banner.classList.toggle('note', duel?.phase === 'hold' || !!waits);
+            els.giveUp.hidden = !(coop && !coop.entering && p.down && !sim.result);
             if (waits) { els.banner.hidden = false; els.banner.textContent = waits; }
             else if (duel && duel.phase === 'hold') {
                 els.banner.hidden = false; els.banner.textContent = duel.waiting === 'peer' ? '对方暂时离开，等待中…' : '对局暂停'; fightAt = null;

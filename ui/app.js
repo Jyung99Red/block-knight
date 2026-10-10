@@ -19,17 +19,21 @@
 // A shared adventure (design.md 10; core/coop.js), from the same room
 // screen: a host opens a room in its own adventure and goes on in it, its
 // code on screen; a guest who comes joins this world, which then runs on
-// under every panel. A phone that joins another's plays in that world
-// (the session's copy) instead of its own, which stands still meanwhile;
-// what it carries there is kept in its own adventure and save as it
-// changes. Leaving, it is the title screen over its own base.
+// under every panel. Each goes its own way through the portals (user,
+// 2026-10-10): a guest in another region has a world of its own, run here
+// as well on the same progress (`apart`), till they meet again. A phone
+// that joins another's plays in that world (the session's copy) instead
+// of its own, which stands still meanwhile; what it carries there is kept
+// in its own adventure and save as it changes. Leaving, it is the title
+// screen over its own base.
 // The menu (ui/menu.js) does not pause the adventure either (user,
 // 2026-10-02); its pause button does, and so do the other panels and the
 // shop and smithy.
 // window.game is for tests and debugging: game.pause() stops the real-time
 // clock, game.run(seconds) steps exactly, game.load(region) starts a
 // region afresh, game.save is the save, game.duel the duel session (or
-// null), game.coop the shared adventure's (or null).
+// null), game.coop the shared adventure's (or null), game.party this
+// phone's worlds (core/party.js: the guest's apart, when it is).
 const app = (() => {
     const MAPS = Object.keys(gameConfig.maps).filter(id => !gameConfig.maps[id].duel);
     // Saving after loot is picked up waits this long, to write once for a handful.
@@ -121,7 +125,10 @@ const app = (() => {
         const copy = p => ({ ...Object.fromEntries([...LERP, 'facing'].map(k => [k, p[k]])), act: p.act ? { move: p.act.move, phase: p.act.phase, t: p.act.t } : null });
         const snapshot = () => new Map([...sim.fighters, ...sim.monsters].map(b => [b.id, copy(b)]));
         let before = snapshot();
-        const loop = simLoop.create(dt => { before = snapshot(); worldSim.step(sim, dt); });
+        // This phone's world and, in a shared adventure, the guest's when
+        // it is in another region (core/party.js: `party.apart`), run here too.
+        const party = partyKit.create(sim);
+        const loop = simLoop.create(dt => { before = snapshot(); partyKit.step(party, dt); });
         function blend(now, then, alpha) {
             const out = { ...now };
             for (const k of LERP) if (Number.isFinite(then[k])) out[k] = then[k] + (now[k] - then[k]) * alpha;
@@ -296,6 +303,7 @@ const app = (() => {
         function persist() {
             if (!begun) return;
             if (!duel) save = saveKit.merge(save, sim);
+            if (!duel && party.apart) save = saveKit.merge(save, party.apart);
             saveKit.write(storage(), save);
             saveAt = null;
         }
@@ -304,32 +312,60 @@ const app = (() => {
         // keep: false drops this world's progress instead of saving it (the
         // save was just erased). spot: where to stand; quiet: no region
         // banner (the same region rebuilt).
-        // A guest in the world comes along: beside this phone's fighter,
-        // or where it stood in the same place rebuilt (`spot`), as hurt as
-        // it was when it travels (`carry`), else whole.
-        function load(id = mapId, { arrival = null, carry = null, spot = null, keep = true, quiet = false } = {}) {
+        // party: in a shared adventure, who comes along (core/party.js
+        // moveHost: 'keep' a guest by this phone's fighter stays by it;
+        // 'alone' this one goes its own way; 'all' everyone).
+        const make = options => worldSim.create({ progress: save, seed: seed(), ...options });
+        function load(id = mapId, { arrival = null, carry = null, spot = null, keep = true, quiet = false, party: mode = 'keep' } = {}) {
             if (!MAPS.includes(id)) throw new Error(`Unknown map ${id}`);
             if (!duel && keep) persist();
             leaveDuel();
             input.releaseAll();
-            const mate = shared() ? sim.fighters.find(f => f.id === GUEST) : null;
-            mapId = id; sim = worldSim.create({ region: id, progress: save, arrival, carry, spot, seed: seed() });
-            if (mate) worldSim.join(sim, { id: GUEST, loadout: mate.loadout, bag: coop.session.bag, hp: carry ? mate.hp : null, spot: spot ? { x: mate.x, y: mate.y, facing: mate.facing } : null });
+            mapId = id;
+            sim = partyKit.moveHost(party, id, { mode, arrival, carry, spot, make, bag: hosting() ? coop.session.bag : null });
             before = snapshot(); resultSeen = null;
             view?.load(sim);
             display.reset(sim, clock, { announce: !quiet });
             closePanel();
-            if (hosting()) coop.session.enter();
+            retell();
         }
-        // What the world asks of the page: travel, a building's panel,
-        // saving. A guest goes through a portal, everyone goes; its
-        // buildings' panels open on its own phone.
-        function react(events) {
+        // The guest goes its own way (a portal, or giving up when down: to
+        // the base, whole). Into this phone's world, it is drawn here.
+        function moveGuest(to, { arrival = null, hp = null } = {}) {
+            persist();
+            const was = sim.fighters.length;
+            if (!partyKit.moveGuest(party, to, { arrival, hp, make, bag: coop.session.bag })) return;
+            if (sim.fighters.length !== was) { before = snapshot(); view?.load(sim); }
+            retell();
+        }
+        // The guest hears of its world anew when that world, or who is in it, changes.
+        let told = null;
+        function retell() {
+            if (!shared()) { told = null; return; }
+            const w = partyKit.guestWorld(party), key = w.fighters.map(f => f.id).join();
+            if (told?.w === w && told.key === key) return;
+            told = { w, key };
+            coop.session.enter();
+        }
+        // Down, waiting for a partner who still stands: give up and go back
+        // to the base (user, 2026-10-10), whole.
+        function giveUp() {
+            if (visiting()) coop.session.giveUp();
+            else if (shared() && partyKit.mayGiveUp(party, 'player')) load('base', { party: 'alone' });
+        }
+        // What a world asks of the page (this phone's, or the guest's apart:
+        // `from`): travel, a building's panel, saving. Through a portal each
+        // goes its own way; a guest's buildings' panels open on its phone.
+        function react(events, from = sim) {
             for (const e of events) {
                 const mate = shared() && e.side === GUEST;
                 if (e.side !== 'player' && e.type !== 'boss_defeated' && !mate) continue;
-                if (e.type === 'travel') { load(e.to, { arrival: e.from, carry: { hp: sim.player.hp } }); return; }
-                if (mate) { if (e.type === 'chest_open' || e.type === 'grave_call') persist(); continue; }
+                if (e.type === 'travel') {
+                    if (mate) moveGuest(e.to, { arrival: e.from, hp: from.fighters.find(f => f.id === GUEST).hp });
+                    else load(e.to, { arrival: e.from, carry: { hp: sim.player.hp }, party: 'alone' });
+                    return;
+                }
+                if (mate || from !== sim) { if (e.type === 'chest_open' || e.type === 'grave_call' || e.type === 'boss_defeated') persist(); continue; }
                 if (e.type === 'open') { input.releaseAll(); if (BUILDING_SCREENS[e.what]) screens.open(BUILDING_SCREENS[e.what]); else menu.open(); }
                 else if (e.type === 'boss_defeated' || e.type === 'chest_open' || e.type === 'grave_call') persist();
                 else if (e.type === 'pickup' && saveAt === null) saveAt = clock + SAVE_DELAY;
@@ -382,10 +418,12 @@ const app = (() => {
         function hostCoop({ link, code, on }) {
             input.releaseAll();
             const session = coopKit.host({
-                send: msg => link.send(msg), now: () => performance.now() / 1000, world: () => sim,
+                send: msg => link.send(msg), now: () => performance.now() / 1000,
+                world: () => partyKit.guestWorld(party) || sim, mate: () => party.apart ? { region: sim.region } : null,
                 on: {
                     join: ({ loadout, bag }) => {
-                        worldSim.join(sim, { id: GUEST, loadout, bag });
+                        partyKit.join(party, { loadout, bag });
+                        told = { w: sim, key: sim.fighters.map(f => f.id).join() };
                         before = snapshot();
                         view?.load(sim);
                         display.notice('同伴加入了', `房间 ${code}`, 2, clock);
@@ -393,9 +431,13 @@ const app = (() => {
                     part: reason => {
                         // (Still connected, it is let go: the room waits for the next one.)
                         if (reason !== 'closed') link.drop();
-                        if (worldSim.part(sim, GUEST)) { before = snapshot(); view?.load(sim); }
+                        if (party.apart) persist();
+                        const here = !party.apart;
+                        if (partyKit.part(party) && here) { before = snapshot(); view?.load(sim); }
+                        told = null;
                         if (COOP_PARTED[reason]) display.notice(COOP_PARTED[reason], `房间 ${code} 还开着`, 2.5, clock);
-                    }
+                    },
+                    giveUp: () => { if (partyKit.mayGiveUp(party, GUEST)) moveGuest('base'); }
                 }
             });
             coop = { role: 'host', session, link, code, ended: null, kept: '' };
@@ -489,7 +531,8 @@ const app = (() => {
         root.querySelector('[data-menu]').addEventListener('click', menuKey);
         window.addEventListener('keydown', e => { if (e.code === 'Escape' && !e.repeat) menuKey(); });
         actions.resume.addEventListener('click', closePanel);
-        actions.home.addEventListener('click', () => load('base'));
+        actions.home.addEventListener('click', () => load('base', { party: 'all' }));
+        root.querySelector('[data-giveup]').addEventListener('click', giveUp);
         actions.erase.addEventListener('click', () => { save = saveKit.erase(storage()); load('base', { keep: false, quiet: true }); begin(); });
         actions.menu.addEventListener('click', () => { closePanel(); menu.open(); });
         actions.surrender.addEventListener('click', () => { duel?.session.surrender(); closePanel(); });
@@ -558,8 +601,11 @@ const app = (() => {
             } else {
                 if (!halted()) loop.advance(seconds);
                 events = worldSim.drain(sim);
-                if (hosting()) coop.session.take(events);
+                // (The guest's world apart: its events are the guest's alone.)
+                const there = party.apart, theirs = there ? worldSim.drain(there) : null;
+                if (hosting()) coop.session.take(theirs || events);
                 react(events);
+                if (theirs && party.apart === there) react(theirs, there);
                 if (hosting()) coop.session.frame();
                 bodies = shownBodies(halted() ? 1 : loop.alpha());
                 if (saveAt !== null && clock >= saveAt) persist();
@@ -567,7 +613,9 @@ const app = (() => {
             const w = world(), self = selfId();
             for (const e of events) sfx.play(e, self, worldSim.outcome(w, self));
             display.events(events, clock);
-            const together = coop && { role: coop.role, code: coop.code, partner: w.fighters.length > 1, waiting: coop.session.waiting, entering: visiting() && !coop.session.sim && !coop.ended };
+            // Where the partner is when not here: the guest apart, or the host away from the guest's world.
+            const elsewhere = hosting() ? party.apart?.region : visiting() ? coop.session.mate?.region : null;
+            const together = coop && { role: coop.role, code: coop.code, partner: w.fighters.length > 1, elsewhere: elsewhere || null, waiting: coop.session.waiting, entering: visiting() && !coop.session.sim && !coop.ended };
             display.update(w, view, clock, bodies, { self, duel: s ? { countdown: s.countdown, phase: s.phase, waiting: s.waiting } : null, coop: together });
             // Portrait is covered by the rotate hint: skip drawing to save power.
             if (view && !portrait.matches) view.render(w, Math.min(seconds, simLoop.MAX_FRAME), { bodies, events, tour: title.isOpen(), yaw: input.yaw(), ...lens });
@@ -590,7 +638,7 @@ const app = (() => {
         requestAnimationFrame(frame);
         window.game = {
             get sim() { return world(); }, get map() { return duel ? 'arena' : visiting() ? coop.session.sim?.region ?? mapId : mapId; }, get panel() { return panel; },
-            get duel() { return duel?.session || null; }, get coop() { return coop?.session || null; }, get save() { return save; }, room, screens, menu, title,
+            get duel() { return duel?.session || null; }, get coop() { return coop?.session || null; }, party, get save() { return save; }, room, screens, menu, title,
             view, input, load, persist,
             pause(flag = true) { paused = flag; loop.reset(); },
             run: seconds => loop.run(seconds)

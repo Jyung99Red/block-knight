@@ -12,9 +12,13 @@
 // 'player' and a 'guest' who joined (design.md 10: `join`, `part`).
 // sim.player, sim.input and sim.stats are the first fighter's own;
 // sim.monsters and sim.dummy are the entities of those types (getters,
-// left out of snapshots). `bags`: what each fighter but the first carries
-// ({ inventory, loadout } by id, core/props.js bagOf); the first one's is
-// the progress. `mirror` (set by core/coop.js, never in a snapshot): this
+// left out of snapshots). `bags`: what a guest carries ({ inventory,
+// loadout } by id, core/props.js bagOf); the host's is the progress. Two
+// players may also be in two regions, one world each (design.md 10: the
+// host's phone runs both, sharing one progress); a world may then hold
+// the guest alone (`create` with `self`), and `help` says a player of the
+// party still stands in the other one: everyone here down does not end the
+// trip, the fallen wait to be picked up (or give up). `mirror` (set by core/coop.js, never in a snapshot): this
 // world is a guest's copy of the host's, which decides everything -- no
 // blow lands, nothing is picked up, used or changed in it.
 // `region` is the map's key in gameConfig.maps; `progress` the world's
@@ -52,8 +56,10 @@ const worldSim = (() => {
     // facing the other; `loadouts` are their gear, [host, guest] (each one
     // picked from duelKit's fair sets; the starter gear when left out),
     // and `dayFrom` the hour it is played at, as seconds into the day
-    // (core/daytime.js).
-    function create({ map = null, region = null, progress = null, arrival = null, carry = null, spot = null, seed = 1, loadout = null, duel = false, loadouts = null, dayFrom = 0 } = {}) {
+    // (core/daytime.js). `self`, `bag`: the one fighter of an adventure
+    // is someone other than the player -- a guest in a region of its own,
+    // with its own bag (design.md 10).
+    function create({ map = null, region = null, progress = null, arrival = null, carry = null, spot = null, seed = 1, loadout = null, duel = false, loadouts = null, dayFrom = 0, self = 'player', bag = null } = {}) {
         if (!map) map = gameConfig.maps[region || 'clearing'];
         if (!map) throw new Error(`Unknown map ${region}`);
         region = region || regionOf(map);
@@ -63,7 +69,7 @@ const worldSim = (() => {
         loadout = { ...(duel ? inventoryKit.starter() : loadout || progress?.loadout || inventoryKit.starter()) };
         if (progress?.edits?.[region]) terrainKit.applyEdits(terrain, progress.edits[region]);
         propKit.regrow(terrain, progress, region);
-        const ids = duel ? DUEL_IDS : ['player'];
+        const ids = duel ? DUEL_IDS : [self];
         const gear = ids.map((_, i) => ({ ...(duel ? loadouts?.[i] || inventoryKit.starter() : loadout) }));
         const spots = ids.map((_, i) => terrainKit.cellCentre(terrain, terrain.spawns[i].col, terrain.spawns[i].row));
         const entry = duel ? null : spot || (arrival ? propKit.arrival(map, terrain, arrival) : null);
@@ -88,7 +94,7 @@ const worldSim = (() => {
             time: 0, tick: 0, terrain, map: map.name || '', region, duel, seed: seed >>> 0, serial: 0, dayFrom: duel ? dayFrom : 0,
             rigs: { fighters: Object.fromEntries(ids.map((id, i) => [id, rigOf(gear[i])])), dummy: dummy ? dummyKit.rig() : null, monsters: Object.fromEntries(kinds.map(k => [k, monsterKit.rig(k)])) },
             fighters, entities: [...(dummy ? [dummy] : []), ...monsters, ...propKit.place(map, terrain, saved, region)],
-            bags: {}, progress: world, events: [], result: null
+            bags: bag ? { [self]: bag } : {}, help: false, progress: world, events: [], result: null
         });
     }
     // Each fighter's skeleton carries its own gear (the blade decides reach).
@@ -108,22 +114,24 @@ const worldSim = (() => {
     // ---- a shared adventure (design.md 10): a second player comes and goes ----
     // Fighter `id` comes into the world in `loadout` with its own `bag` ({
     // inventory, loadout }: what it picks up and uses is its own, not the
-    // world's progress), standing at `spot` ({ x, y, facing }; else beside
-    // the first fighter), with `hp` (else whole; at least 1). Returns it.
-    function join(sim, { id, loadout, bag = null, spot = null, hp = null }) {
+    // world's progress; none for the host), standing at `spot` ({ x, y,
+    // facing }; else beside the first fighter), with `hp` (else whole; at
+    // least 1); `first`: put first (the host walking into its guest's
+    // world: sim.player is the host again). Returns it.
+    function join(sim, { id, loadout, bag = null, spot = null, hp = null, first = false }) {
         if (sim.duel || sim.fighters.some(f => f.id === id)) throw new Error(`Fighter ${id} cannot join`);
         const at = spot || beside(sim, sim.fighters[0]);
         const f = fighter(id, loadout, at, at.facing ?? sim.fighters[0].facing, !!gameConfig.maps[sim.region]?.training);
         if (Number.isFinite(hp)) f.hp = Math.max(1, Math.min(f.maxHp, Math.round(hp)));
-        sim.fighters.push(f);
+        if (first) sim.fighters.unshift(f); else sim.fighters.push(f);
         sim.rigs.fighters[id] = rigOf(loadout);
         if (bag) sim.bags[id] = bag;
         return f;
     }
-    // Fighter `id` leaves (never the first). Whether it was there.
+    // Fighter `id` leaves (never the last one). Whether it was there.
     function part(sim, id) {
         const i = sim.fighters.findIndex(f => f.id === id);
-        if (i < 1) return false;
+        if (i < 0 || sim.fighters.length < 2) return false;
         sim.fighters.splice(i, 1);
         delete sim.rigs.fighters[id];
         delete sim.bags[id];
@@ -185,9 +193,11 @@ const worldSim = (() => {
 
     // One step. `judge` false: swings pass through and nothing is decided
     // (a guest predicting between the host's snapshots; a mirror never judges).
-    function step(sim, dt, { judge = !sim.mirror } = {}) {
+    // `clock` false: the time played is kept by another world sharing this
+    // one's progress.
+    function step(sim, dt, { judge = !sim.mirror, clock = true } = {}) {
         sim.time += dt; sim.tick++;
-        if (!sim.duel && sim.progress) sim.progress.clock += dt;
+        if (!sim.duel && sim.progress && clock) sim.progress.clock += dt;
         for (const f of sim.fighters) fighterKit.tick(sim, f, dt);
         fighterKit.settle(sim, judge);
         entityKit.tick(sim, dt);
@@ -203,8 +213,9 @@ const worldSim = (() => {
             return;
         }
         // A world has no end to win; falling is the one way a trip ends --
-        // for everyone at once, once the last one standing falls (design.md 10).
-        if (sim.fighters.every(f => f.down)) { sim.result = { outcome: 'lose', at: sim.time }; combatKit.emit(sim, 'result', { outcome: 'lose' }); }
+        // for everyone at once, once the last one standing falls (design.md
+        // 10), here and in the partner's region (`help`).
+        if (sim.fighters.every(f => f.down) && !sim.help) { sim.result = { outcome: 'lose', at: sim.time }; combatKit.emit(sim, 'result', { outcome: 'lose' }); }
     }
     // A duel given up by fighter `id`: the other one wins.
     function concede(sim, id) {

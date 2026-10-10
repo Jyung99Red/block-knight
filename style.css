@@ -174,8 +174,9 @@ html, body {
 .hud-hold {
     position: absolute; z-index: 2; left: 0; top: 0; width: 40px; height: 40px; border-radius: 50%; pointer-events: none; --hold: 0;
     background: conic-gradient(var(--accent) calc(var(--hold) * 360deg), rgba(14, 18, 23, 0.55) 0);
-    -webkit-mask: radial-gradient(circle, transparent calc(50% - 6px), #000 calc(50% - 5.5px));
-    mask: radial-gradient(circle, transparent calc(50% - 6px), #000 calc(50% - 5.5px));
+    /* A thin rim, 3 px (user, 2026-10-10: it was some 12). */
+    -webkit-mask: radial-gradient(circle closest-side, transparent calc(100% - 3.5px), #000 calc(100% - 3px));
+    mask: radial-gradient(circle closest-side, transparent calc(100% - 3.5px), #000 calc(100% - 3px));
     filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.6));
 }
 .hud-hold[hidden] { display: none; }
@@ -208,6 +209,13 @@ html, body {
 }
 .hud-banner.note { font-size: 26px; white-space: nowrap; }
 .hud-banner[hidden] { display: none; }
+/* Down in a shared adventure, waiting to be picked up: or give up (design.md 10). */
+.hud-giveup {
+    position: absolute; z-index: 4; left: 50%; top: calc(32% + 40px); transform: translateX(-50%);
+    padding: 8px 18px; border-radius: 8px; font: 500 15px/1 var(--font); cursor: pointer; touch-action: manipulation;
+    border: 1px solid rgba(255, 255, 255, 0.35); background: rgba(20, 25, 31, 0.82); color: var(--fg);
+}
+.hud-giveup[hidden] { display: none; }
 .hud-arrow {
     position: absolute; z-index: 3; pointer-events: none; left: 0; top: 0; width: 0; height: 0;
     border-top: 11px solid transparent; border-bottom: 11px solid transparent; border-left: 20px solid #e0574b;

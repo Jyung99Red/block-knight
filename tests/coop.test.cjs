@@ -1,13 +1,15 @@
 // A shared adventure (design.md 10): two players in one world -- a guest
 // joining and leaving it, its own bag, partners who do not hurt each
 // other, monsters going for the nearer one, a partner down picked up by
-// the other, a trip that ends only when everyone has fallen -- and the host/guest protocol of core/coop.js
+// the other, a trip that ends only when everyone has fallen -- or in two
+// (core/party.js: each going its own way, a fall waited out or given up),
+// and the host/guest protocol of core/coop.js
 // played end to end over an in-memory channel, the host's page played as
 // ui/app.js plays it.
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const { load } = require('./load.cjs');
-const { worldSim: W, coopKit, simLoop, saveKit, propKit, terrainKit, inventoryKit, interactKit, fighterKit, space, gameConfig } = load();
+const { worldSim: W, coopKit, partyKit, simLoop, saveKit, propKit, terrainKit, inventoryKit, interactKit, fighterKit, space, gameConfig } = load();
 const GUEST = coopKit.GUEST, U = gameConfig.world.unitsPerBlock, PV = gameConfig.pvp;
 // The M3 field, fixed for these tests (the game's regions change with content).
 const FIELD = require('./fixtures/m3-field.cjs');
@@ -30,10 +32,38 @@ test('a guest joins beside the first player, in its own gear, and leaves again',
     assert.ok(Math.abs(d - gameConfig.coop.beside) < 1e-6, `stands ${d} away`);
     assert.ok(terrainKit.openWay(sim.terrain, p.x, p.y, g.x, g.y, g.radius), 'on open ground it can walk from');
     assert.throws(() => W.join(sim, { id: GUEST, loadout: gameConfig.gear.starter }));
-    assert.equal(W.part(sim, 'player'), false, 'the first one never leaves');
     assert.equal(W.part(sim, GUEST), true);
     assert.deepEqual(who(sim), ['player']);
     assert.equal(sim.rigs.fighters[GUEST], undefined); assert.equal(sim.bags[GUEST], undefined);
+    assert.equal(W.part(sim, 'player'), false, 'the last one never leaves');
+});
+
+test('a world of the guest\'s own; the host walks in first and out again, leaving it the guest\'s', () => {
+    const bag = bagOf(3), sim = W.create({ map: FIELD, self: GUEST, loadout: gameConfig.gear.starter, bag, carry: { hp: 50 } });
+    assert.deepEqual(who(sim), [GUEST]);
+    assert.equal(sim.bags[GUEST], bag); assert.equal(sim.player.hp, 50);
+    const h = W.join(sim, { id: 'player', loadout: gameConfig.gear.starter, first: true, spot: { x: 600, y: 300, facing: 0 } });
+    assert.deepEqual(who(sim), ['player', GUEST]);
+    assert.equal(sim.player, h);
+    assert.equal(propKit.bagOf(sim, h), sim.progress, 'the host carries the progress');
+    assert.equal(W.part(sim, 'player'), true);
+    assert.deepEqual(who(sim), [GUEST]);
+});
+
+test('worlds sharing one progress keep one clock; a fall waited out while the partner stands elsewhere', () => {
+    const a = W.create({ map: FIELD }), b = W.create({ map: FIELD, self: GUEST, loadout: gameConfig.gear.starter, bag: bagOf() });
+    b.progress = a.progress;
+    const c0 = a.progress.clock;
+    W.step(a, 0.5); W.step(b, 0.5, { clock: false });
+    assert.ok(Math.abs(a.progress.clock - c0 - 0.5) < 1e-9);
+    for (const m of a.monsters) Object.assign(m, { x: 100, y: 100, home: { x: 100, y: 100 } });
+    a.help = true;
+    a.player.hp = 0; fighterKit.fall(a, a.player);
+    W.step(a, 0.05);
+    assert.equal(a.result, null, 'the partner may still come');
+    a.help = false;
+    W.step(a, 0.02);
+    assert.equal(a.result?.outcome, 'lose');
 });
 
 test('partners do not cut each other (user, 2026-10-10: unlike a duel)', () => {
@@ -165,24 +195,38 @@ test('a mirror decides nothing: no blow lands, nothing is picked up, used or bur
 });
 
 // ---- the protocol, both ends over an in-memory channel ----
-// The host's page as ui/app.js plays it: its world steps, its events are
-// numbered for the guest, a portal taken by either one takes both (the
-// guest coming along), and the world is handed to the guest anew.
+// The host's page as ui/app.js plays it: its worlds step (core/party.js),
+// the events of the guest's world are numbered for the guest, through a
+// portal each goes its own way, and the guest hears of its world anew when
+// that world or who is in it changes.
 function party({ region = 'base', latency = 0.02, bag = bagOf(), hostOn = {} } = {}) {
-    let clock = 100, lastDue = 0, save = saveKit.fresh();
+    let clock = 100, lastDue = 0, save = saveKit.fresh(), told = null;
     const queue = [], log = { parts: [], joins: 0, ends: [], starts: 0, sent: { host: [], guest: [] }, shown: [] };
-    const host = { sim: W.create({ region, progress: save, seed: 5 }) };
-    const loop = simLoop.create(dt => W.step(host.sim, dt));
+    const worlds = partyKit.create(W.create({ region, progress: save, seed: 5 }));
+    const host = { get sim() { return worlds.sim; } };
+    const loop = simLoop.create(dt => partyKit.step(worlds, dt));
+    const persist = () => { save = saveKit.merge(save, worlds.sim); if (worlds.apart) save = saveKit.merge(save, worlds.apart); };
+    const make = options => W.create({ progress: save, seed: 6, ...options });
     const sender = role => msg => {
         const copy = plain(msg);
         lastDue = Math.max(lastDue, clock + latency);
         log.sent[role].push(copy); queue.push({ to: role === 'host' ? 'guest' : 'host', at: lastDue, msg: copy });
     };
+    function retell() {
+        if (!hs.guestIn) { told = null; return; }
+        const w = partyKit.guestWorld(worlds), key = w.fighters.map(f => f.id).join();
+        if (told?.w === w && told.key === key) return;
+        told = { w, key };
+        hs.enter();
+    }
+    const hostTo = (id, options) => { persist(); partyKit.moveHost(worlds, id, { make, bag: hs.bag, ...options }); retell(); };
+    const guestTo = (id, options) => { persist(); partyKit.moveGuest(worlds, id, { make, bag: hs.bag, ...options }); retell(); };
     const hs = coopKit.host({
-        send: sender('host'), now: () => clock, world: () => host.sim,
+        send: sender('host'), now: () => clock, world: () => partyKit.guestWorld(worlds) || worlds.sim, mate: () => worlds.apart ? { region: worlds.sim.region } : null,
         on: {
-            join: ({ loadout, bag: carried }) => { log.joins++; W.join(host.sim, { id: GUEST, loadout, bag: carried }); },
-            part: reason => { log.parts.push(reason); W.part(host.sim, GUEST); },
+            join: ({ loadout, bag: carried }) => { log.joins++; partyKit.join(worlds, { loadout, bag: carried }); told = { w: worlds.sim, key: worlds.sim.fighters.map(f => f.id).join() }; },
+            part: reason => { log.parts.push(reason); persist(); partyKit.part(worlds); told = null; },
+            giveUp: () => { if (partyKit.mayGiveUp(worlds, GUEST)) guestTo('base'); },
             ...hostOn
         }
     });
@@ -192,12 +236,10 @@ function party({ region = 'base', latency = 0.02, bag = bagOf(), hostOn = {} } =
         hs.open(); gs.open(); deliver();
         return gs;
     };
-    function travel(e) {
-        const mate = host.sim.fighters.find(f => f.id === GUEST);
-        save = saveKit.merge(save, host.sim);
-        host.sim = W.create({ region: e.to, progress: save, arrival: e.from, carry: { hp: host.sim.player.hp }, seed: 6 });
-        if (mate) W.join(host.sim, { id: GUEST, loadout: mate.loadout, bag: hs.bag, hp: mate.hp });
-        hs.enter();
+    // A portal taken in world `from`: each goes its own way.
+    function travel(e, from) {
+        if (e.side === GUEST) guestTo(e.to, { arrival: e.from, hp: partyKit.guestOf(from).hp });
+        else hostTo(e.to, { mode: 'alone', arrival: e.from, carry: { hp: worlds.sim.player.hp } });
     }
     function deliver() {
         while (queue.length && queue[0].at <= clock + 1e-9) {
@@ -208,19 +250,27 @@ function party({ region = 'base', latency = 0.02, bag = bagOf(), hostOn = {} } =
     const frame = (seconds = 0.01) => {
         clock += seconds; deliver();
         loop.advance(seconds);
-        const events = W.drain(host.sim);
-        hs.take(events);
-        const away = events.find(e => e.type === 'travel');
-        if (away) travel(away);
+        const here = worlds.sim, there = worlds.apart, mine = W.drain(here), theirs = there ? W.drain(there) : null;
+        hs.take(theirs || mine);
+        const away = mine.find(e => e.type === 'travel'), gone = theirs?.find(e => e.type === 'travel');
+        if (away) travel(away, here);
+        if (gone && worlds.apart === there) travel(gone, there);
         hs.frame();
         if (gs) log.shown.push(...gs.frame(seconds));
         deliver();
     };
     const run = seconds => { for (let i = 0; i < Math.round(seconds / 0.01); i++) frame(); };
     connect();
-    return { host, hs, get gs() { return gs; }, log, run, frame, connect, deliver, get clock() { return clock; }, pass(s) { clock += s; } };
+    return { host, worlds, hs, get gs() { return gs; }, log, run, frame, connect, deliver, hostTo, get clock() { return clock; }, pass(s) { clock += s; } };
 }
-const mine = p => p.gs.sim.fighters.find(f => f.id === GUEST), theirs = p => p.host.sim.fighters.find(f => f.id === GUEST);
+const mine = p => p.gs.sim.fighters.find(f => f.id === GUEST), theirs = p => partyKit.guestOf(partyKit.guestWorld(p.worlds));
+// Stand fighter `f` at a portal of its world, facing it, and the monsters far off.
+function atPortal(sim, f, test = e => !e.requires) {
+    const portal = sim.entities.find(e => e.type === 'portal' && test(e));
+    Object.assign(f, { x: portal.x + Math.cos(portal.facing) * 30, y: portal.y + Math.sin(portal.facing) * 30, facing: portal.facing + Math.PI });
+    for (const m of sim.monsters) Object.assign(m, { x: 0, y: 0, home: { x: 0, y: 0 } });
+    return portal;
+}
 
 test('let in: the guest builds the host\'s world as it is, both players in it, its bag along', () => {
     const region = regionWith(e => e.type === 'node'), bag = bagOf(42, { goblin_ear: 3 });
@@ -287,24 +337,72 @@ test('the guest\'s pickups reach its phone; a resource it gathers changes the gr
     assert.ok(p.log.shown.some(e => e.type === 'pickup' && e.side === GUEST), 'and it hears of it');
 });
 
-test('a portal the guest takes takes both; it arrives with the host, in a new world', () => {
-    const region = Object.keys(gameConfig.maps).find(id => !gameConfig.maps[id].duel && W.create({ region: id }).entities.some(e => e.type === 'portal' && !e.requires));
-    const p = party({ region });
+test('through a portal each goes its own way: the guest\'s own world runs on the host\'s phone, and the host walks into it', () => {
+    const p = party({ region: 'base' });
     p.run(0.3);
-    const portal = p.host.sim.entities.find(e => e.type === 'portal' && !e.requires), g = theirs(p);
-    Object.assign(g, { x: portal.x + Math.cos(portal.facing) * 30, y: portal.y + Math.sin(portal.facing) * 30, facing: portal.facing + Math.PI });
-    for (const m of p.host.sim.monsters) Object.assign(m, { x: 0, y: 0, home: { x: 0, y: 0 } });
+    const portal = atPortal(p.host.sim, theirs(p)), from = p.host.sim.region;
+    theirs(p).hp = 50;
     p.run(0.3);
-    g.hp = 50;
     p.gs.command({ type: 'press', button: 'interact' });
-    p.run(0.3);
-    assert.equal(p.host.sim.region, portal.to);
-    assert.deepEqual(who(p.host.sim), ['player', GUEST]);
+    p.run(0.5);
+    // The guest is there, the host here; one progress, one clock.
+    assert.equal(p.host.sim.region, from); assert.deepEqual(who(p.host.sim), ['player']);
+    assert.equal(p.worlds.apart.region, portal.to); assert.deepEqual(who(p.worlds.apart), [GUEST]);
     assert.equal(theirs(p).hp, 50, 'as hurt as it was');
+    assert.equal(p.worlds.apart.progress, p.host.sim.progress);
+    assert.equal(p.gs.sim.region, portal.to); assert.equal(p.gs.mate?.region, from, 'the guest knows where the host is');
     assert.equal(p.log.starts, 2);
-    assert.equal(p.gs.sim.region, portal.to);
-    const [h, me] = p.gs.sim.fighters;
-    assert.ok(Math.hypot(h.x - me.x, h.y - me.y) < gameConfig.coop.beside + 1, 'beside the host');
+    const c0 = p.host.sim.progress.clock, t0 = p.worlds.apart.time;
+    p.run(1);
+    assert.ok(Math.abs(p.host.sim.progress.clock - c0 - 1) < 0.02, 'the time played counted once');
+    assert.ok(p.worlds.apart.time > t0 + 0.9, 'the guest\'s world runs on');
+    // The host takes the same portal: it walks into the guest's world as it is, the guest there still.
+    const there = p.worlds.apart, g = theirs(p), gx = g.x;
+    atPortal(p.host.sim, p.host.sim.player, e => e.to === portal.to);
+    p.run(0.3);
+    W.command(p.host.sim, { type: 'press', button: 'interact' });
+    p.run(0.5);
+    assert.equal(p.host.sim, there); assert.equal(p.worlds.apart, null);
+    assert.deepEqual(who(p.host.sim), ['player', GUEST]);
+    assert.equal(theirs(p), g); assert.equal(g.x, gx);
+    assert.equal(p.log.starts, 3); assert.equal(p.gs.mate, null);
+    assert.deepEqual(who(p.gs.sim), ['player', GUEST]);
+});
+
+test('down alone with the partner standing elsewhere: waited out; given up, back to the base whole; all down, the trip ends', () => {
+    const p = party({ region: 'base' });
+    p.run(0.3);
+    atPortal(p.host.sim, theirs(p));
+    p.run(0.3);
+    p.gs.command({ type: 'press', button: 'interact' });
+    p.run(0.5);
+    const there = p.worlds.apart, g = theirs(p);
+    g.hp = 0; fighterKit.fall(there, g);
+    p.run(0.5);
+    assert.equal(there.result, null, 'the host still stands: the guest waits');
+    assert.equal(partyKit.mayGiveUp(p.worlds, GUEST), true);
+    p.gs.giveUp();
+    p.run(0.3);
+    assert.equal(p.worlds.apart, null);
+    assert.deepEqual(who(p.host.sim), ['player', GUEST], 'back in the base, where the host is');
+    assert.equal(theirs(p).down, false); assert.equal(theirs(p).hp, theirs(p).maxHp);
+    // Apart again, both fall: no one to wait for, the trip ends on both sides.
+    atPortal(p.host.sim, theirs(p));
+    p.run(0.3);
+    p.gs.command({ type: 'release', button: 'interact' }); p.gs.command({ type: 'press', button: 'interact' });
+    p.run(0.5);
+    const h = p.host.sim.player, far = p.worlds.apart;
+    h.hp = 0; fighterKit.fall(p.host.sim, h);
+    p.run(0.3);
+    assert.equal(p.host.sim.result, null);
+    theirs(p).hp = 0; fighterKit.fall(far, theirs(p));
+    p.run(0.3);
+    assert.equal(p.host.sim.result?.outcome, 'lose'); assert.equal(far.result?.outcome, 'lose');
+    // Home: everyone, whole.
+    p.hostTo('base', { mode: 'all' });
+    p.run(0.3);
+    assert.deepEqual(who(p.host.sim), ['player', GUEST]); assert.equal(p.worlds.apart, null);
+    assert.ok(p.host.sim.fighters.every(f => !f.down && f.hp === f.maxHp));
 });
 
 test('the guest picks the host up: decided on the host, seen on both', () => {
