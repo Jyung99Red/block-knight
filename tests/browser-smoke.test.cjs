@@ -728,7 +728,8 @@ test('two phones in one browser (?link=local): a shared adventure -- the host pl
         await B.page.click('[data-menu-act="title"]');
         assert.deepEqual(await B.page.evaluate(() => [window.game.map, window.game.coop, window.game.title.isOpen(), window.game.sim.progress.inventory.gold]), ['base', null, true, got]);
         await A.page.waitForFunction(() => window.game.sim.fighters.length === 1, null, { timeout: 30000 });
-        assert.match(await text(A.page, '[data-hud="room"]'), /等人加入/);
+        // (The HUD says so at the next frame.)
+        await A.page.waitForFunction(() => /等人加入/.test(document.querySelector('[data-hud="room"]').textContent), null, { timeout: 30000 });
         assert.deepEqual(A.errors, []); assert.deepEqual(B.errors, []);
     } finally { await context.close(); }
 });
