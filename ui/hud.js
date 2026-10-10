@@ -9,9 +9,16 @@
 // region's name as it is entered, a banner when a boss falls, and what is
 // picked up. In a duel: the rival's HP in the foe panel and over its head,
 // the countdown, and an arrow at the edge of the screen while the rival is
-// in sight but off it. Reads the simulation; never writes it.
+// in sight but off it. In a shared adventure (design.md 10): the room's
+// code (the host's, for the other phone to type), the partner's HP over
+// its head and the arrow to it, and a line while this one is down and the
+// partner is not, or while the world waits for the host. What is carried
+// (gold, potions) is this fighter's own (its bag, else the progress: as
+// core/props.js bagOf). Reads the simulation; never writes it.
 const hud = (() => {
     const FIGHTING = monsterKit.FIGHTING;
+    // What a world with nothing carried shows (a duel).
+    const EMPTY = Object.freeze({ inventory: Object.freeze({ gold: 0, items: Object.freeze({}) }) });
     // The clock (design.md 3.6; user, 2026-10-06): a dial with noon at the
     // top that its hand goes round once a day. Its rim is the day's light
     // by the hour, in `segments` arcs: each the colour of the look that
@@ -41,7 +48,7 @@ const hud = (() => {
             floats: $('[data-hud="floats"]'), mobs: $('[data-hud="mobs"]'), banner: $('[data-hud="banner"]'), arrow: $('[data-hud="arrow"]'),
             boss: $('[data-hud="boss"]'), key: $('[data-button="interact"]'), keyText: $('[data-hud="interact"]'),
             tag: $('[data-hud="tag"]'), hold: $('[data-hud="hold"]'), tagName: $('[data-hud="tag-name"]'), tagWhy: $('[data-hud="tag-why"]'), toasts: $('[data-hud="toasts"]'),
-            region: $('[data-hud="region"]'), regionTitle: $('[data-hud="region-title"]'), regionNote: $('[data-hud="region-note"]'),
+            room: $('[data-hud="room"]'), region: $('[data-hud="region"]'), regionTitle: $('[data-hud="region-title"]'), regionNote: $('[data-hud="region-note"]'),
             guardKey: $('[data-button="guard"]'), offhand: $('[data-button="offhand"]'), offhandCount: $('[data-hud="offhand-count"]'),
             clock: $('[data-hud="clock"]'), clockRing: $('[data-hud="clock-ring"]'), clockHand: $('[data-hud="clock-hand"]')
         };
@@ -162,8 +169,11 @@ const hud = (() => {
                 }
             }
         }
-        // duel (optional): { countdown, phase, waiting } from the duel session.
-        function update(sim, view, now, bodies = null, { self = 'player', duel = null } = {}) {
+        // duel (optional): { countdown, phase, waiting } from the duel
+        // session. coop (optional): { role: 'host' | 'guest', code, partner
+        // (someone else is in the world), waiting ('peer': the host is in
+        // the background), entering (the host's world not here yet) }.
+        function update(sim, view, now, bodies = null, { self = 'player', duel = null, coop = null } = {}) {
             selfId = self;
             const p = sim.fighters.find(f => f.id === self) || sim.fighters[0], G = gameConfig.combat.guardBar;
             const shownOf = body => bodies?.get(body.id) || body;
@@ -175,7 +185,7 @@ const hud = (() => {
             // The offhand key shows the torch or the potion (and how many are
             // left, greyed with none); with a shield or nothing it is grey.
             const kind = inventoryKit.offhandOf(p.loadout), item = kind === 'torch' || kind === 'potion' ? kind : 'none';
-            const potions = item === 'potion' ? inventoryKit.count(sim.progress || { inventory: { gold: 0, items: {} } }, 'potion') : 0;
+            const bag = sim.bags?.[p.id] || sim.progress || EMPTY, potions = item === 'potion' ? inventoryKit.count(bag, 'potion') : 0;
             els.offhand.dataset.kind = item;
             els.offhand.classList.toggle('lit', !!p.lit);
             els.offhand.classList.toggle('disabled', item === 'none' || (item === 'potion' && potions < 1));
@@ -184,7 +194,9 @@ const hud = (() => {
             // The region and what is carried.
             const map = gameConfig.maps[sim.region];
             els.goal.hidden = !!sim.duel || !map;
-            if (!els.goal.hidden) els.goal.textContent = map.training ? map.name : `${map.name} · ${gameConfig.items.gold.icon} ${sim.progress?.inventory.gold ?? 0}`;
+            if (!els.goal.hidden) els.goal.textContent = map.training ? map.name : `${map.name} · ${gameConfig.items.gold.icon} ${bag.inventory.gold}`;
+            els.room.hidden = !coop;
+            if (coop) els.room.textContent = coop.role === 'host' ? `房间 ${coop.code} · ${coop.partner ? '同伴在这里' : '等人加入'}` : `联机 · 房间 ${coop.code}`;
             // The clock: the hour the world is drawn at, to a quarter of a
             // degree; the sun or the moon, whichever is up.
             const hour = view?.hour ? view.hour(sim) : dayKit.hourOf(sim), turn = Math.round(dialAngle(hour) * 4) / 4;
@@ -247,8 +259,12 @@ const hud = (() => {
             }
             // The countdown, then "开始" for a moment; while the fight is
             // held for a phone in the background, who it waits for.
-            els.banner.classList.toggle('note', duel?.phase === 'hold');
-            if (duel && duel.phase === 'hold') {
+            // In a shared adventure: who it waits for, or this one down while the partner is not.
+            const waits = coop?.entering ? '正在进入房主的世界…' : coop?.waiting === 'peer' && coop.role === 'guest' ? '房主暂时离开，等待中…'
+                : coop && p.down && !sim.result ? '倒下了，等同伴' : '';
+            els.banner.classList.toggle('note', duel?.phase === 'hold' || !!waits);
+            if (waits) { els.banner.hidden = false; els.banner.textContent = waits; }
+            else if (duel && duel.phase === 'hold') {
                 els.banner.hidden = false; els.banner.textContent = duel.waiting === 'peer' ? '对方暂时离开，等待中…' : '对局暂停'; fightAt = null;
             } else if (duel && duel.countdown > 0 && (duel.phase === 'countdown' || duel.phase === 'starting')) {
                 els.banner.hidden = false; els.banner.textContent = String(Math.ceil(duel.countdown - 1e-6)); fightAt = null;
@@ -322,7 +338,9 @@ const hud = (() => {
                 floats.push({ el, at: e.at, born: now });
             }
         }
-        return { update, events, reset };
+        // A line in the middle of the screen for a moment (a partner coming
+        // or going): `announce`.
+        return { update, events, reset, notice: announce };
     }
     return { attach };
 })();

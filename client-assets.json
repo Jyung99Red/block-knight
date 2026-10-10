@@ -36,6 +36,7 @@
       "core/save.js",
       "core/loop.js",
       "core/duel.js",
+      "core/coop.js",
       "core/controls.js",
       "render/textures.js",
       "render/terrain_light.js",

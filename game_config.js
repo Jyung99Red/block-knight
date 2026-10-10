@@ -1082,6 +1082,13 @@ const gameConfig = (() => {
             countdown: 3, snapshotSeconds: 0.05, heartbeatSeconds: 0.25, timeoutSeconds: 5, awaySeconds: 60,
             replaySeconds: 0.25, latencySeconds: 0.15, steer: 0.1, resyncSeconds: 0.1, historyEvents: 128, connectSeconds: 12,
             weapons: ['wooden_sword', 'assassin_dagger']
-        }
+        },
+
+        // 11. A shared adventure (design.md 10): one phone's world, two
+        // players. snapshotSeconds: host to guest state (the whole world's,
+        // so less often than a duel's); beside: how far from the host
+        // (world units) someone joining, or travelling along, stands. The
+        // rest of the network's timing is the duel's (pvp).
+        coop: { snapshotSeconds: 0.1, beside: 48 }
     });
 })();

@@ -64,12 +64,12 @@ const dummyKit = (() => {
         const u0 = d.t / move.swing;
         d.t = Math.min(move.swing, d.t + dt);
         const u1 = d.t / move.swing;
-        const p = worldSim.nearestFighter(sim, d);
-        if (!d.struck && p && terrainKit.lineClear(sim.terrain, d.x, d.y, p.x, p.y)) {
-            const target = { id: p.id, boxes: fighterKit.hurtboxes(sim, p) };
+        // Whoever standing it can reach; the first one met is struck (none in a mirror).
+        const targets = d.struck || sim.mirror ? [] : sim.fighters.filter(f => !f.down && terrainKit.lineClear(sim.terrain, d.x, d.y, f.x, f.y));
+        if (targets.length) {
             const solveAt = u => rigKit.solve(sim.rigs.dummy, pose({ ...d, t: u * move.swing }), space.toBlocks(d.x, d.y, d.h), space.yawOf(d.facing));
-            const hit = combatKit.sweep(sim.rigs.dummy, solveAt, u0, u1, [target]);
-            if (hit) { d.struck = true; combatKit.strike(sim, p, d, d.atk * move.ratio, hit.point, { move: move.id }); }
+            const hit = combatKit.sweep(sim.rigs.dummy, solveAt, u0, u1, targets.map(f => ({ id: f.id, boxes: fighterKit.hurtboxes(sim, f) })));
+            if (hit) { d.struck = true; combatKit.strike(sim, targets.find(f => f.id === hit.id), d, d.atk * move.ratio, hit.point, { move: move.id }); }
         }
         if (d.phase === 'swing' && d.t >= move.swing - 1e-9) { d.phase = 'recover'; d.t = 0; }
     }

@@ -445,5 +445,5 @@ const duelKit = (() => {
             lost() { end('lost'); }
         };
     }
-    return { PROTOCOL, PREDICTED, rules, loadoutFor, validSnapshot, create };
+    return { PROTOCOL, PREDICTED, hash, rules, loadoutFor, validSnapshot, create };
 })();

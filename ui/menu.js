@@ -7,7 +7,8 @@
 // there). The character page: HP and stats over the four gear slots (a
 // column) and the bag beside them, the picked item below (one bag: the
 // base's storage opens this too), gear changed in the base only
-// (design.md 7.2). The settings page takes its place: this phone's
+// (design.md 7.2) and not by a guest in another's world (design.md 10).
+// No pause in a shared adventure: the world is two players'. The settings page takes its place: this phone's
 // settings (ui/settings_view.js). The menu opens on the character page
 // every time (user, 2026-10-08). The close key has the corner to itself.
 // Gear changes go through core/inventory.js on the world's progress and
@@ -18,10 +19,11 @@ const menuScreen = (() => {
     const TURN = 0.012;
     const esc = text => String(text).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
 
-    // hooks: progress() the world's progress; player() the fighter shown
-    // (HP); canChange() gear may be changed now;
-    // changed('gear'); act(name) for the side's buttons (pause, title);
-    // closed({ gearChanged }).
+    // hooks: progress() what this phone's fighter carries (the world's
+    // progress, or a guest's bag); player() the fighter shown (HP);
+    // gearLock() why gear may not be changed now ('' when it may);
+    // canPause(); changed('gear'); act(name) for the side's buttons
+    // (pause, title); closed({ gearChanged }).
     function attach(root, hooks) {
         const el = root.querySelector('[data-menu-screen]'), $ = sel => el.querySelector(sel);
         const figureBox = $('[data-menu-figure]'), slotsEl = $('[data-menu-slots]'), bagEl = $('[data-menu-bag]'), detailEl = $('[data-menu-detail]');
@@ -55,7 +57,7 @@ const menuScreen = (() => {
             const p = hooks.progress(), item = I[picked], lines = [item.desc];
             let compare = '', actions = [];
             if (item.slot) {
-                const slot = item.slot, worn = p.loadout[slot] === picked, lock = hooks.canChange() ? '' : '只能在曙光村里换装备';
+                const slot = item.slot, worn = p.loadout[slot] === picked, lock = hooks.gearLock();
                 lines.unshift(`${slotLine(item)}${item.stats ? ' · ' + statLine(item.stats) : ''}${item.kind === 'supply' ? ` · 有 ${owned(picked)}` : ''}`);
                 const now = K.statsOf(p.loadout), next = K.statsOf({ ...p.loadout, [slot]: worn ? null : picked });
                 if (!(worn && slot === 'main')) compare = K.STATS.map(k => [STAT_NAMES[k], now[k], next[k]]).filter(([, a, b]) => a !== b)
@@ -112,6 +114,7 @@ const menuScreen = (() => {
             if (open) return;
             open = true; picked = null; message = ''; gearChanged = false; page = 'role';
             el.hidden = false;
+            acts.pause.hidden = !hooks.canPause();
             fig = figureView.figure();
             if (fig && fig.canvas.parentNode !== figureBox) figureBox.prepend(fig.canvas);
             figureBox.classList.toggle('none', !fig);

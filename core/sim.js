@@ -8,9 +8,15 @@
 // read and drain.
 //
 // `fighters` are the people playing: one in PVE ('player'), two in a duel
-// ('host' and 'guest', design.md 8). sim.player, sim.input and
-// sim.stats are the first fighter's own; sim.monsters and sim.dummy are the
-// entities of those types (getters, left out of snapshots).
+// ('host' and 'guest', design.md 8), and in a shared adventure the host's
+// 'player' and a 'guest' who joined (design.md 10: `join`, `part`).
+// sim.player, sim.input and sim.stats are the first fighter's own;
+// sim.monsters and sim.dummy are the entities of those types (getters,
+// left out of snapshots). `bags`: what each fighter but the first carries
+// ({ inventory, loadout } by id, core/props.js bagOf); the first one's is
+// the progress. `mirror` (set by core/coop.js, never in a snapshot): this
+// world is a guest's copy of the host's, which decides everything -- no
+// blow lands, nothing is picked up, used or changed in it.
 // `region` is the map's key in gameConfig.maps; `progress` the world's
 // progress carried between regions (core/save.js: bosses down, chests
 // opened, what is carried), never part of a duel's snapshot.
@@ -59,22 +65,12 @@ const worldSim = (() => {
         propKit.regrow(terrain, progress, region);
         const ids = duel ? DUEL_IDS : ['player'];
         const gear = ids.map((_, i) => ({ ...(duel ? loadouts?.[i] || inventoryKit.starter() : loadout) }));
-        // Each fighter's skeleton carries its own gear (the blade decides reach).
-        const rigOf = g => rigKit.build(playerModel, { scale: gameConfig.models.playerScale, equipment: equipmentModels.forLoadout(g) });
         const spots = ids.map((_, i) => terrainKit.cellCentre(terrain, terrain.spawns[i].col, terrain.spawns[i].row));
         const entry = duel ? null : spot || (arrival ? propKit.arrival(map, terrain, arrival) : null);
         if (entry) spots[0] = entry;
         const fighters = ids.map((id, i) => {
             const at = spots[i], other = spots[1 - i];
-            return fighterKit.init({
-                x: at.x, y: at.y, h: space.groundHeight(at.x, at.y),
-                facing: duel ? Math.atan2(other.y - at.y, other.x - at.x) : entry ? entry.facing : Math.PI / 2, radius: gameConfig.player.radius,
-                // gait: walk/run cycle phase, in cycles. pace: share of the
-                // walking speed built up from a standstill. moveTime: seconds
-                // of unbroken walking, which turns into a run.
-                speed: 0, pace: 0, gait: 0, moveBlend: 0, runBlend: 0, moveTime: 0,
-                loadout: { ...gear[i] }
-            }, { id, endless: !duel && !!map.training, stats: inventoryKit.statsOf(gear[i]) });
+            return fighter(id, gear[i], at, duel ? Math.atan2(other.y - at.y, other.x - at.x) : entry ? entry.facing : Math.PI / 2, !duel && !!map.training);
         });
         if (carry && Number.isFinite(carry.hp)) fighters[0].hp = Math.max(1, Math.min(fighters[0].maxHp, Math.round(carry.hp)));
         const saved = progress || {};
@@ -92,8 +88,59 @@ const worldSim = (() => {
             time: 0, tick: 0, terrain, map: map.name || '', region, duel, seed: seed >>> 0, serial: 0, dayFrom: duel ? dayFrom : 0,
             rigs: { fighters: Object.fromEntries(ids.map((id, i) => [id, rigOf(gear[i])])), dummy: dummy ? dummyKit.rig() : null, monsters: Object.fromEntries(kinds.map(k => [k, monsterKit.rig(k)])) },
             fighters, entities: [...(dummy ? [dummy] : []), ...monsters, ...propKit.place(map, terrain, saved, region)],
-            progress: world, events: [], result: null
+            bags: {}, progress: world, events: [], result: null
         });
+    }
+    // Each fighter's skeleton carries its own gear (the blade decides reach).
+    const rigOf = gear => rigKit.build(playerModel, { scale: gameConfig.models.playerScale, equipment: equipmentModels.forLoadout(gear) });
+    // A fighter `id` in `gear`, standing at `at` facing `facing`.
+    function fighter(id, gear, at, facing, endless) {
+        return fighterKit.init({
+            x: at.x, y: at.y, h: space.groundHeight(at.x, at.y), facing, radius: gameConfig.player.radius,
+            // gait: walk/run cycle phase, in cycles. pace: share of the
+            // walking speed built up from a standstill. moveTime: seconds
+            // of unbroken walking, which turns into a run.
+            speed: 0, pace: 0, gait: 0, moveBlend: 0, runBlend: 0, moveTime: 0,
+            loadout: { ...gear }
+        }, { id, endless, stats: inventoryKit.statsOf(gear) });
+    }
+
+    // ---- a shared adventure (design.md 10): a second player comes and goes ----
+    // Fighter `id` comes into the world in `loadout` with its own `bag` ({
+    // inventory, loadout }: what it picks up and uses is its own, not the
+    // world's progress), standing at `spot` ({ x, y, facing }; else beside
+    // the first fighter), with `hp` (else whole; at least 1). Returns it.
+    function join(sim, { id, loadout, bag = null, spot = null, hp = null }) {
+        if (sim.duel || sim.fighters.some(f => f.id === id)) throw new Error(`Fighter ${id} cannot join`);
+        const at = spot || beside(sim, sim.fighters[0]);
+        const f = fighter(id, loadout, at, at.facing ?? sim.fighters[0].facing, !!gameConfig.maps[sim.region]?.training);
+        if (Number.isFinite(hp)) f.hp = Math.max(1, Math.min(f.maxHp, Math.round(hp)));
+        sim.fighters.push(f);
+        sim.rigs.fighters[id] = rigOf(loadout);
+        if (bag) sim.bags[id] = bag;
+        return f;
+    }
+    // Fighter `id` leaves (never the first). Whether it was there.
+    function part(sim, id) {
+        const i = sim.fighters.findIndex(f => f.id === id);
+        if (i < 1) return false;
+        sim.fighters.splice(i, 1);
+        delete sim.rigs.fighters[id];
+        delete sim.bags[id];
+        return true;
+    }
+    // Where someone joining fighter `f` stands: coop.beside from it to its
+    // left, else its right, behind, ahead -- the first open spot there is
+    // a straight way to; else just by it.
+    function beside(sim, f) {
+        const d = gameConfig.coop.beside, t = sim.terrain, others = entityKit.obstacles(sim, f);
+        for (const turn of [Math.PI / 2, -Math.PI / 2, Math.PI, 0]) {
+            const a = f.facing + turn, x = f.x + Math.cos(a) * d, y = f.y + Math.sin(a) * d;
+            if (!terrainKit.openWay(t, f.x, f.y, x, y, f.radius)) continue;
+            if (others.some(o => Math.hypot(o.x - x, o.y - y) < o.radius + f.radius)) continue;
+            return { x, y, facing: f.facing };
+        }
+        return { x: f.x + 1, y: f.y, facing: f.facing };
     }
 
     // Commands from the input layer or the network, for fighter `who`
@@ -126,19 +173,19 @@ const worldSim = (() => {
         return false;
     }
 
-    // The nearest fighter still standing, or null.
-    function nearestFighter(sim, from) {
+    // The nearest fighter still standing (and passing `test`, if given), or null.
+    function nearestFighter(sim, from, test = null) {
         let best = null, far = Infinity;
         for (const f of sim.fighters) {
             const d = Math.hypot(f.x - from.x, f.y - from.y);
-            if (!f.down && d < far) { far = d; best = f; }
+            if (!f.down && d < far && (!test || test(f, d))) { far = d; best = f; }
         }
         return best;
     }
 
     // One step. `judge` false: swings pass through and nothing is decided
-    // (a duel's guest predicting between the host's snapshots).
-    function step(sim, dt, { judge = true } = {}) {
+    // (a guest predicting between the host's snapshots; a mirror never judges).
+    function step(sim, dt, { judge = !sim.mirror } = {}) {
         sim.time += dt; sim.tick++;
         if (!sim.duel && sim.progress) sim.progress.clock += dt;
         for (const f of sim.fighters) fighterKit.tick(sim, f, dt);
@@ -155,8 +202,9 @@ const worldSim = (() => {
             combatKit.emit(sim, 'result', { winner: sim.result.winner });
             return;
         }
-        // A world has no end to win; falling is the one way a trip ends.
-        if (sim.player.down) { sim.result = { outcome: 'lose', at: sim.time }; combatKit.emit(sim, 'result', { outcome: 'lose' }); }
+        // A world has no end to win; falling is the one way a trip ends --
+        // for everyone at once, once the last one standing falls (design.md 10).
+        if (sim.fighters.every(f => f.down)) { sim.result = { outcome: 'lose', at: sim.time }; combatKit.emit(sim, 'result', { outcome: 'lose' }); }
     }
     // A duel given up by fighter `id`: the other one wins.
     function concede(sim, id) {
@@ -173,10 +221,10 @@ const worldSim = (() => {
         return r.winner === null ? 'draw' : r.winner === id ? 'win' : 'lose';
     }
 
-    // The state as plain data (what a duel's host sends), and back. A
-    // snapshot has everything but the terrain, the rigs, the progress and
-    // the events; restoring keeps the world it is written into.
-    const STATIC = new Set(['terrain', 'rigs', 'events', 'progress']);
+    // The state as plain data (what a host sends), and back. A snapshot
+    // has everything but the terrain, the rigs, the progress, the events
+    // and the mirror mark; restoring keeps the world it is written into.
+    const STATIC = new Set(['terrain', 'rigs', 'events', 'progress', 'mirror']);
     function snapshot(sim) {
         const out = {};
         for (const [key, value] of Object.entries(sim)) if (!STATIC.has(key)) out[key] = value;
@@ -189,5 +237,5 @@ const worldSim = (() => {
     }
     // Take the events since the last call.
     function drain(sim) { return sim.events.splice(0); }
-    return { BUTTONS, DUEL_IDS, create, command, nearestFighter, step, concede, outcome, snapshot, restore, drain };
+    return { BUTTONS, DUEL_IDS, create, join, part, beside, command, nearestFighter, step, concede, outcome, snapshot, restore, drain };
 })();

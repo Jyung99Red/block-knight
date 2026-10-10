@@ -22,9 +22,9 @@ its own `dist/peerjs.min.js`, MIT) is an ordinary script in
   buildings, portals, chests, drops, thickets, resources that grow
   back), the interact key, items,
   gear and trade, the save format (storage injected), input maths, and
-  the PVP duel protocol (host
+  the PVP duel and shared-adventure protocols (host
   authority, guest prediction) over an injected `send`. Node tests run it;
-  in a duel the host's copy decides. Also the boot loader.
+  with two phones the host's copy decides. Also the boot loader.
 - `models/` model data: skeletons, boxes, equipment, key poses, palette.
 - `render/` three.js drawing only (terrain as one mesh per chunk); reads the
   simulation, never writes it. The menu's figure and the item icons are

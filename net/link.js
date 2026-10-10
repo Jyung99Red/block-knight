@@ -1,6 +1,8 @@
-// The channel between two phones for a duel (design.md 8), carried
-// over from the 2D version (tag v1-2d, pvp/pvp_net.js and pvp_room.js). A
-// room is a 4-digit code. Both phones meet through a PeerJS signalling
+// The channel between two phones for a duel (design.md 8) or a shared
+// adventure (design.md 10), carried over from the 2D version (tag v1-2d,
+// pvp/pvp_net.js and pvp_room.js). A room is a 4-digit code; duels and
+// shared adventures have rooms apart (`room`), so a code of one never
+// finds the other. Both phones meet through a PeerJS signalling
 // server (the free public one unless the address says ?peer=host:port,
 // for a self-hosted PeerServer) and then talk directly over WebRTC; the
 // server never carries the game. With ?link=local two tabs of one browser
@@ -9,11 +11,13 @@
 //
 // A link knows nothing about the game. on: { open() the channel is up,
 // message(msg), close() it is gone, status(text) for the room screen }.
-// host(code) resolves once the room exists and waits for one guest;
-// join(code) resolves once connected. Failures reject with an Error whose
-// message is fit to show; `code: 'taken'` means pick another room code.
+// host(code) resolves once the room exists and waits for one guest at a
+// time: once one is gone (or let go: `drop`) the next may come, and the
+// channel opens again. join(code) resolves once connected. Failures
+// reject with an Error whose message is fit to show; `code: 'taken'`
+// means pick another room code.
 const netLink = (() => {
-    const PREFIX = 'blockduel-1-';
+    const PREFIXES = { duel: 'blockduel-1-', coop: 'blockcoop-1-' };
     const ICE = [{ urls: 'stun:stun.l.google.com:19302' }, { urls: 'stun:stun1.l.google.com:19302' }];
     const params = () => new URLSearchParams(window.location.search);
     const kind = () => params().get('link') === 'local' ? 'local' : 'peer';
@@ -40,7 +44,7 @@ const netLink = (() => {
     };
     const peerError = e => fail(PEER_ERRORS[e?.type] || e?.message || String(e), e?.type === 'unavailable-id' ? 'taken' : e?.type);
 
-    function peerLink(on) {
+    function peerLink(on, PREFIX) {
         let peer = null, conn = null, closed = false;
         function attach(c) {
             conn = c;
@@ -96,6 +100,12 @@ const netLink = (() => {
                 if (!conn?.open) return false;
                 try { conn.send(msg); return true; } catch (_) { return false; }
             },
+            // Let the guest there is go; the room stays open.
+            drop() {
+                const c = conn;
+                conn = null;
+                try { c?.close(); } catch (_) { /* already gone */ }
+            },
             close() {
                 closed = true;
                 try { conn?.close(); } catch (_) { /* already gone */ }
@@ -106,7 +116,7 @@ const netLink = (() => {
     }
 
     // ---- two tabs of one browser ----
-    function localLink(on) {
+    function localLink(on, PREFIX) {
         const me = Math.random().toString(36).slice(2);
         let channel = null, other = null, closed = false;
         const post = data => channel?.postMessage({ from: me, ...data });
@@ -144,6 +154,7 @@ const netLink = (() => {
                 });
             },
             send(msg) { if (!other || closed) return false; post({ kind: 'msg', to: other, msg }); return true; },
+            drop() { if (!other || closed) return; bye(); other = null; },
             close() {
                 if (closed) return;
                 bye(); closed = true;
@@ -157,7 +168,7 @@ const netLink = (() => {
         }
     }
 
-    // A link of the kind the address asks for.
-    function create(on = {}) { return kind() === 'local' ? localLink(on) : peerLink(on); }
+    // A link of the kind the address asks for; `room`: 'duel' or 'coop'.
+    function create(on = {}, { room = 'duel' } = {}) { return kind() === 'local' ? localLink(on, PREFIXES[room]) : peerLink(on, PREFIXES[room]); }
     return { create, randomCode, kind };
 })();

@@ -4,8 +4,9 @@
 // hold a B), the guard key (with the shield if one is carried, else the
 // weapon), the offhand key (potion, torch), being struck, and moving
 // between all of that. Rules carried over from the 2D version (tag v1-2d,
-// pve/spatial_engine.js). Every rule takes the fighter it applies to: PVE
-// has one (sim.player), a duel two (sim.fighters).
+// pve/spatial_engine.js). Every rule takes the fighter it applies to: an
+// adventure has one (sim.player) or two sharing it, a duel two
+// (sim.fighters).
 //
 // State on a fighter:
 //   id, side   who it is ('player'; a duel's 'host' and 'guest'); events
@@ -65,11 +66,12 @@ const fighterKit = (() => {
         });
     }
     // Everyone a fighter can hit: the training dummy, living monsters, and
-    // the other fighters still standing.
+    // in a duel the other fighter still standing (in a shared adventure the
+    // other player is a partner, not a foe: design.md 10).
     function foes(sim, p) {
         const out = [];
         for (const e of sim.entities) if (e.type === 'dummy' || (e.type === 'monster' && monsterKit.living(e))) out.push(e);
-        for (const f of sim.fighters) if (f !== p && !f.down) out.push(f);
+        if (sim.duel) for (const f of sim.fighters) if (f !== p && !f.down) out.push(f);
         return out;
     }
     // Bodies in the way: other fighters and solid entities.
@@ -293,7 +295,7 @@ const fighterKit = (() => {
             press(sim, p) {
                 if (p.drink?.phase === 'wait') { p.drink = null; return true; }
                 if (p.drink) return false;
-                if (inventoryKit.count(propKit.progressOf(sim), 'potion') < 1) { emit(sim, p, 'potion_empty'); return false; }
+                if (inventoryKit.count(propKit.bagOf(sim, p), 'potion') < 1) { emit(sim, p, 'potion_empty'); return false; }
                 p.buffer = null;
                 if (p.act?.phase === 'charge') { p.act = null; emit(sim, p, 'charge_dropped'); }
                 p.drink = { phase: 'wait', t: 0 };
@@ -311,7 +313,9 @@ const fighterKit = (() => {
                 d.t += dt;
                 if (d.t < F().potion.seconds - 1e-9) return;
                 p.drink = null;
-                const bag = propKit.progressOf(sim);
+                // (A mirror leaves the drink itself to the host.)
+                if (sim.mirror) return;
+                const bag = propKit.bagOf(sim, p);
                 if (inventoryKit.count(bag, 'potion') < 1) return;
                 inventoryKit.give(bag, 'potion', -1);
                 const before = p.hp;

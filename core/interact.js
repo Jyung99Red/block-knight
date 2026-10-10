@@ -8,6 +8,9 @@
 // A fight stops none of it (user, 2026-10-06: every limit taken out for
 // now; they may come back).
 //
+// In a mirror (core/sim.js) the hand goes out and a hold fills, but the
+// action itself is the host's to do.
+//
 // On a fighter: focus (the target's id, or null), using ({ id, t } while
 // a hold fills, else null), and the left hand reaching out to it: handOut
 // (0..1, how far) and handFor (seconds it stays out after a use). The
@@ -45,7 +48,7 @@ const interactKit = (() => {
         if (!t || !t.offer.ready) return false;
         p.handFor = I().hand.stay;
         if (t.offer.hold > 0) { p.using = { id: t.entity.id, t: 0 }; return true; }
-        entityKit.kitOf(t.entity).use(sim, t.entity, p);
+        if (!sim.mirror) entityKit.kitOf(t.entity).use(sim, t.entity, p);
         return true;
     }
     function release(sim, p) { p.using = null; }
@@ -60,7 +63,7 @@ const interactKit = (() => {
         const t = target(sim, p);
         if (!t || t.entity.id !== u.id || !t.offer.ready || !p.input.buttons.interact.held) { p.using = null; return; }
         u.t += dt;
-        if (u.t >= t.offer.hold - 1e-9) { p.using = null; p.handFor = H.stay; entityKit.kitOf(t.entity).use(sim, t.entity, p); }
+        if (u.t >= t.offer.hold - 1e-9) { p.using = null; p.handFor = H.stay; if (!sim.mirror) entityKit.kitOf(t.entity).use(sim, t.entity, p); }
     }
     return { pick, target, press, release, tick };
 })();

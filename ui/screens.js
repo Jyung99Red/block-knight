@@ -2,9 +2,11 @@
 // landscape, two columns: a list on the left, what is picked on the right.
 // The shop sells potions, a torch and the ring of stealth and buys materials; the smithy makes
 // gear from materials and gold. (The bag is the menu's, ui/menu.js.) Every
-// change goes through core/inventory.js on the world's progress;
-// `changed(kind)` tells the page (it saves). Reads and writes no simulation
-// state but that progress. `iconHtml` is an item's picture for any screen:
+// change goes through core/inventory.js on what this phone's fighter
+// carries (the world's progress, or a guest's bag in another's world:
+// design.md 10); `changed(kind, deal)` tells the page (it saves, or a
+// guest has the host make the same deal: { op, id, n }). Reads and writes
+// no simulation state but that. `iconHtml` is an item's picture for any screen:
 // gear drawn from its own model (render/figure_view.js), else its emoji.
 const itemScreens = (() => {
     const SLOT_NAMES = Object.freeze({ main: '主手', offhand: '副手', armor: '护甲', accessory: '饰品' });
@@ -15,7 +17,7 @@ const itemScreens = (() => {
         return url ? `<img class="item-icon" src="${url}" alt="">` : `<span class="item-icon">${gameConfig.items[id].icon}</span>`;
     }
 
-    // hooks: progress() the world's progress; changed('trade'); closed().
+    // hooks: progress() what is carried; changed('trade', deal); closed().
     function attach(root, hooks) {
         const el = root.querySelector('[data-screen]'), $ = sel => el.querySelector(sel);
         const title = $('[data-screen-title]'), tabs = $('[data-screen-tabs]'), gold = $('[data-screen-gold]');
@@ -48,9 +50,9 @@ const itemScreens = (() => {
                     };
                 },
                 act(action, id) {
-                    const p = hooks.progress();
-                    const why = action === 'buy' ? K.buy(p, id) : K.sell(p, id, action === 'sellAll' ? Infinity : 1);
-                    if (!why) hooks.changed('trade');
+                    const p = hooks.progress(), n = action === 'sellAll' ? Infinity : 1;
+                    const why = action === 'buy' ? K.buy(p, id) : K.sell(p, id, n);
+                    if (!why) hooks.changed('trade', action === 'buy' ? { op: 'buy', id, n: 1 } : { op: 'sell', id, n });
                     return why || (action === 'buy' ? `买到了${I[id].name}` : `卖掉了${I[id].name}`);
                 }
             },
@@ -72,7 +74,7 @@ const itemScreens = (() => {
                 },
                 act(action, id) {
                     const why = K.craft(hooks.progress(), id);
-                    if (!why) hooks.changed('trade');
+                    if (!why) hooks.changed('trade', { op: 'craft', id, n: 1 });
                     return why || `打造好了${I[id].name}，打开菜单装上`;
                 }
             }

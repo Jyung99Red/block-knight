@@ -1,11 +1,17 @@
-// The room screen (design.md 8.4): pick a weapon (pvp.weapons), then
-// create a room and show its code, or type the other phone's code on a
-// keypad and join. Once the channel is up the link is handed to
-// `connected({ link, role, code, on, weapon })`; the duel itself is
-// ui/app.js's, which sets on.message and on.close. `closed()`: the screen
-// was left without a connection. The pick is remembered on this phone.
+// The room screen (design.md 8.4, 10), for a duel or a shared adventure
+// (`open(mode)`: 'duel' | 'coop'). A duel: pick a weapon (pvp.weapons),
+// then create a room and show its code, or type the other phone's code on
+// a keypad and join. Once the channel is up the link is handed to
+// `connected({ link, role, code, on, weapon, mode })`; what goes on over
+// it is ui/app.js's, which sets on.message and on.close. A shared
+// adventure picks nothing (each brings its own gear), and its host's link
+// is handed over as soon as the room exists: the host goes on in its own
+// world with the code on screen, and each guest that comes after opens the
+// channel (on.open). `closed()`: the screen was left without a
+// connection. The pick is remembered on this phone.
 const roomScreen = (() => {
     const INTRO = '两台手机都要联网，不必连同一个 Wi-Fi。先选武器，然后一台创建房间，另一台输入房间号加入。';
+    const COOP_INTRO = '两台手机都要联网。一台创建房间，在自己的世界里接着冒险，画面上有房间号；另一台输入房间号，加入房主的世界一起打。宝箱和资源是房主世界的，捡到的东西归捡的人，带回自己的存档。';
     const KEY = 'block-knight-weapon';
     // One line on how each weapon type plays.
     const LINES = { sword: '射程远，出招稳重', dagger: '出招快，连段长，要贴近' };
@@ -36,14 +42,16 @@ const roomScreen = (() => {
         }
         pick(weapon);
         const actions = Object.fromEntries([...panel.querySelectorAll('[data-room-action]')].map(b => [b.dataset.roomAction, b]));
-        let step = 'closed', typed = '', link = null, attempt = 0;
-        // Link callbacks; the duel takes message and close over.
+        let step = 'closed', typed = '', link = null, attempt = 0, mode = 'duel', handed = null;
+        // The link's callbacks, its own for each link; the duel or the
+        // shared adventure takes them over.
         let hooks = {};
 
         function say(text, error = false) { status.textContent = text; status.classList.toggle('error', error); }
         function digits(text) { slots.forEach((slot, i) => { slot.textContent = text[i] || ''; slot.classList.toggle('next', step === 'join' && i === text.length); }); }
         const SHOW = {
             entry: { title: '联机对战', note: INTRO, pick: true, buttons: { host: '创建房间', join: '加入房间', back: '返回' }, primary: 'host' },
+            coop: { title: '联机冒险', note: COOP_INTRO, buttons: { host: '创建房间', join: '加入房间', back: '返回' }, primary: 'host' },
             hosting: { title: '创建房间', note: '把房间号告诉对方，让对方点"加入房间"。', code: true, buttons: { back: '取消' } },
             join: { title: '加入房间', note: '输入对方的 4 位房间号。', code: true, keys: true, buttons: { connect: '加入', back: '返回' }, primary: 'connect' },
             joining: { title: '加入房间', note: '', code: true, keys: true, buttons: { back: '取消' } }
@@ -52,8 +60,8 @@ const roomScreen = (() => {
             step = next;
             const S = SHOW[next];
             panel.hidden = false;
-            title.textContent = S.title;
-            note.textContent = S.pick ? S.note : [S.note, `你用：${typeOf(weapon).name}`].filter(Boolean).join(' ');
+            title.textContent = mode === 'coop' && next !== 'coop' ? `${S.title} · 联机冒险` : S.title;
+            note.textContent = S.pick || mode === 'coop' ? S.note : [S.note, `你用：${typeOf(weapon).name}`].filter(Boolean).join(' ');
             picker.hidden = !S.pick;
             if (S.pick) drawIcons();
             code.hidden = !S.code; keys.hidden = !S.keys;
@@ -73,13 +81,17 @@ const roomScreen = (() => {
 
         // ---- hosting: a room with a fresh code, waiting for one guest ----
         function makeLink(role, roomCode) {
-            hooks = {};
-            return netLink.create({
-                open: () => handOver(role, roomCode),
-                message: msg => hooks.message?.(msg),
-                close: () => hooks.close?.(),
-                status: text => { if (step !== 'closed') say(text); }
-            });
+            const own = hooks = {};
+            const made = netLink.create({
+                // The first time the channel is up the link is handed over;
+                // a shared adventure's host's, handed over already, takes
+                // each guest that comes after.
+                open: () => { if (made === handed) own.open?.(); else handOver(role, roomCode); },
+                message: msg => own.message?.(msg),
+                close: () => own.close?.(),
+                status: text => { if (step !== 'closed' && made !== handed) say(text); }
+            }, { room: mode });
+            return made;
         }
         async function host(retries = 3) {
             const mine = ++attempt, roomCode = netLink.randomCode();
@@ -92,10 +104,12 @@ const roomScreen = (() => {
                 if (mine !== attempt) return;
                 link.close(); link = null;
                 if (error.code === 'taken' && retries > 0) { host(retries - 1); return; }
-                show('entry'); say(`创建失败：${error.message}`, true);
+                show(mode === 'coop' ? 'coop' : 'entry'); say(`创建失败：${error.message}`, true);
                 return;
             }
-            if (mine === attempt && step === 'hosting') say('等待对方加入…');
+            if (mine !== attempt || step !== 'hosting') return;
+            if (mode === 'coop') handOver('host', roomCode);
+            else say('等待对方加入…');
         }
         // ---- joining with a typed code ----
         async function join() {
@@ -113,10 +127,10 @@ const roomScreen = (() => {
         }
         function handOver(role, roomCode) {
             if (!link) return;
-            const handed = link;
+            handed = link;
             link = null; attempt++;
             close();
-            connected({ link: handed, role, code: roomCode, on: hooks, weapon });
+            connected({ link: handed, role, code: roomCode, on: hooks, weapon, mode });
         }
         function cancel() {
             attempt++;
@@ -136,7 +150,7 @@ const roomScreen = (() => {
         actions.join.addEventListener('click', () => { typed = ''; show('join'); say(''); });
         actions.connect.addEventListener('click', join);
         actions.back.addEventListener('click', () => {
-            if (step === 'hosting' || step === 'join') { cancel(); show('entry'); say(''); }
+            if (step === 'hosting' || step === 'join') { cancel(); show(mode === 'coop' ? 'coop' : 'entry'); say(''); }
             else if (step === 'joining') { cancel(); show('join'); say(''); }
             else { cancel(); close(); closed?.(); }
         });
@@ -155,9 +169,9 @@ const roomScreen = (() => {
         }, true);
 
         return {
-            open() { cancel(); typed = ''; show('entry'); say(''); actions.host.focus({ preventScroll: true }); },
+            open(next = 'duel') { cancel(); mode = next === 'coop' ? 'coop' : 'duel'; typed = ''; show(mode === 'coop' ? 'coop' : 'entry'); say(''); actions.host.focus({ preventScroll: true }); },
             isOpen: () => step !== 'closed',
-            get step() { return step; }, get weapon() { return weapon; }, pick
+            get step() { return step; }, get weapon() { return weapon; }, get mode() { return mode; }, pick
         };
     }
     return { attach };

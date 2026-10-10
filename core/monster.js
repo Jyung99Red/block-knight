@@ -6,7 +6,10 @@
 // world's own dice; it enrages when low. Past the leash it walks home,
 // whoever is by it, mending as it goes, and a blow on the way does not
 // turn it round (user, 2026-10-06). A fighter a ring hides
-// (fighterKit.hidden) is not noticed.
+// (fighterKit.hidden) is not noticed. With two players (design.md 10) it
+// notices either one it can see, and always goes for the nearer one still
+// standing (user, 2026-10-10); a blow lands on whichever one it meets
+// first. In a mirror (core/sim.js) no blow lands: the host's world says.
 // Their blows hit by the same box test as the player's sword (design.md
 // 5); the wolf's leap and the spider's spring ram with the whole body along
 // the path. How far a move reaches, and the warning on the ground, are swept
@@ -287,7 +290,7 @@ const monsterKit = (() => {
     function inMove(sim, m) { let n = 0; for (const o of sim.monsters) if (o !== m && o.kind === m.kind && MOVING.has(o.phase)) n++; return n; }
 
     // ---- the AI, on the monster's own clock (dt is already times tempo) ----
-    // It minds the nearest fighter still standing (in PVE, the player).
+    // It minds the nearest fighter still standing (alone, the player).
     function think(sim, m, dt) {
         const S = configOf(m.kind), p = worldSim.nearestFighter(sim, m) || sim.fighters[0], d = distance(m, p), alive = !p.down;
         const t = sim.terrain, short = m.radius + p.radius;
@@ -295,7 +298,8 @@ const monsterKit = (() => {
         switch (m.phase) {
             case 'patrol': {
                 // It notices only a player it can see: a wall that hides is in the way (terrainKit.sightClear), and so is a ring of stealth.
-                if (alive && d <= S.alertRange && !fighterKit.hidden(p) && terrainKit.sightClear(t, m.x, m.y, p.x, p.y)) { m.phase = 'alert'; m.t = 0; emit(sim, m, 'alert'); return; }
+                const seen = (f, far) => far <= S.alertRange && !fighterKit.hidden(f) && terrainKit.sightClear(t, m.x, m.y, f.x, f.y);
+                if (worldSim.nearestFighter(sim, m, seen)) { m.phase = 'alert'; m.t = 0; emit(sim, m, 'alert'); return; }
                 if (m.rest > 0) { m.rest = Math.max(0, m.rest - dt); return; }
                 const x = m.home.x + Math.cos(m.patrolAt) * S.patrolRadius, y = m.home.y + Math.sin(m.patrolAt) * S.patrolRadius;
                 // A waypoint in a wall or behind one is passed over.
@@ -382,17 +386,18 @@ const monsterKit = (() => {
         const u1 = m.t / move.swing;
         const x0 = m.x, y0 = m.y, want = m.stopped ? 0 : lunge(move, u1) - lunge(move, u0);
         if (want > 0) terrainKit.moveCircle(sim.terrain, m, Math.cos(m.facing) * want, Math.sin(m.facing) * want, obstacles(sim, m));
-        const p = worldSim.nearestFighter(sim, m);
-        if (!m.struck && p && terrainKit.lineClear(sim.terrain, m.x, m.y, p.x, p.y)) {
+        // Whoever standing it can reach with no wall between; the first one met is struck.
+        const targets = m.struck || sim.mirror ? [] : sim.fighters.filter(f => !f.down && terrainKit.lineClear(sim.terrain, m.x, m.y, f.x, f.y));
+        if (targets.length) {
             const x1 = m.x, y1 = m.y;
             const at = u => {
                 const k = u1 > u0 ? (u - u0) / (u1 - u0) : 1;
                 return rigKit.solve(r, pose(r, { ...m, t: u * move.swing }), space.toBlocks(x0 + (x1 - x0) * k, y0 + (y1 - y0) * k, m.h), space.yawOf(m.facing));
             };
-            const hit = combatKit.sweep(r, at, u0, u1, [{ id: p.id, boxes: fighterKit.hurtboxes(sim, p) }], striking(move));
+            const hit = combatKit.sweep(r, at, u0, u1, targets.map(f => ({ id: f.id, boxes: fighterKit.hurtboxes(sim, f) })), striking(move));
             if (hit) {
                 m.struck = true; m.stopped = true;
-                combatKit.strike(sim, p, m, m.atk * move.ratio * (m.enraged ? S.enrage.atk : 1), hit.point, { move: m.move });
+                combatKit.strike(sim, targets.find(f => f.id === hit.id), m, m.atk * move.ratio * (m.enraged ? S.enrage.atk : 1), hit.point, { move: m.move });
             }
         }
         if (m.phase === 'swing' && m.t >= move.swing - 1e-9) { m.phase = 'recover'; m.t = 0; }

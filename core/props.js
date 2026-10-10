@@ -37,6 +37,11 @@
 //   only; nothing is done with it.
 // A map lists its buildings, portals and chests next to its rows; each entry
 // must sit on the letters that draw it, so a map cannot disagree with itself.
+// The world is shared (design.md 10): a chest opened, a resource gathered,
+// a boss called back are the world's, whoever did it; what is picked up,
+// drunk or spent goes to or from the bag of the one who did (`bagOf`). In a
+// mirror (core/sim.js) nothing is picked up, used, burnt away or called
+// back: the host's world does that and its snapshots bring it.
 const propKit = (() => {
     const DIRS = Object.freeze({ north: [0, -1], south: [0, 1], east: [1, 0], west: [-1, 0] });
     // The sides a wall torch looks for its wall on, in order.
@@ -49,6 +54,9 @@ const propKit = (() => {
     // Progress of the world (core/save.js): bosses down, chests opened, what
     // is carried. Duels and tests may have none.
     const progressOf = sim => sim.progress || (sim.progress = { bosses: {}, revived: {}, chests: {}, inventory: { gold: 0, items: {} }, clock: 0, gathered: {} });
+    // What fighter `f` carries ({ inventory, loadout }): a guest's own bag,
+    // else the world's progress.
+    const bagOf = (sim, f) => sim.bags?.[f?.id] || progressOf(sim);
     const nodeKey = (region, c, r) => `${region}/${c},${r}`;
     // What a gathered resource leaves: rubble for a boulder, the map's floor for a plant.
     const spentOf = (terrain, kind) => terrainKit.isSolid(kind) ? terrainKit.KIND.gravel : terrain.floor;
@@ -181,7 +189,7 @@ const propKit = (() => {
             if (e.requires && !downed(sim, e.requires)) Object.assign(out, { ready: false, why: `${bossName(e.requires)}守着它` });
         } else if (e.type === 'grave') {
             if (e.state !== 'ready') return null;
-            const short = missing(sim, e.boss);
+            const short = missing(sim, e.boss, p);
             out = { verb: '复活', name: `${bossName(e.boss)}之墓`, hold: gameConfig.interact.graveHold, ready: !short, why: short ? `要${short}` : '' };
         } else if (e.type === 'brush') {
             if (e.burning >= 0) return null;
@@ -215,10 +223,10 @@ const propKit = (() => {
     // ---- a boss's grave ----
     // Is boss `kind` in the world: standing, or fallen and not yet sunk?
     const bossHere = (sim, kind) => sim.entities.some(m => m.type === 'monster' && m.kind === kind && (monsterKit.living(m) || m.t < gameConfig.props.graveAfter));
-    // What is still wanted to call boss `kind` back, as words ('哥布林耳 ×6
-    // (有 2)'), or '' when everything is carried.
-    function missing(sim, kind) {
-        const bag = progressOf(sim), short = [];
+    // What fighter `p` still wants to call boss `kind` back, as words
+    // ('哥布林耳 ×6 (有 2)'), or '' when everything is carried.
+    function missing(sim, kind, p) {
+        const bag = bagOf(sim, p), short = [];
         for (const [id, n] of Object.entries(gameConfig.monsters[kind].revive || {})) {
             const have = inventoryKit.count(bag, id);
             if (have < n) short.push(`${inventoryKit.itemOf(id)?.name || id} ×${n}（有 ${have}）`);
@@ -229,7 +237,7 @@ const propKit = (() => {
     // is beaten again), and the grave starts to glow.
     function call(sim, e, p) {
         const bag = progressOf(sim);
-        for (const [id, n] of Object.entries(gameConfig.monsters[e.boss].revive || {})) inventoryKit.give(bag, id, -n);
+        for (const [id, n] of Object.entries(gameConfig.monsters[e.boss].revive || {})) inventoryKit.give(bagOf(sim, p), id, -n);
         bag.revived = { ...bag.revived, [e.boss]: true };
         Object.assign(e, { state: 'calling', t: 0, caller: p.id });
         emit(sim, 'grave_call', { side: p.id, target: e.id, kind: e.boss, at: space.toBlocks(e.x, e.y, 20) });
@@ -239,7 +247,7 @@ const propKit = (() => {
     function tickGrave(sim, e, dt) {
         e.t = Math.min(99, e.t + dt);
         if (e.state === 'calling') {
-            if (e.t < gameConfig.props.graveCall - 1e-9) return;
+            if (e.t < gameConfig.props.graveCall - 1e-9 || sim.mirror) return;
             const spawn = sim.terrain.monsters[e.spawn], caller = sim.fighters.find(f => f.id === e.caller) || sim.fighters[0];
             const m = entityKit.add(sim, Object.assign(monsterKit.create(sim.terrain, spawn, e.spawn), { id: entityKit.nextId(sim, 'boss'), phase: 'rise', t: 0 }));
             m.facing = Math.atan2(caller.y - m.y, caller.x - m.x);
@@ -273,7 +281,7 @@ const propKit = (() => {
             e.spread = true;
             for (const o of sim.entities) if (o.type === 'brush' && Math.abs(o.col - e.col) + Math.abs(o.row - e.row) === 1) ignite(sim, o, null);
         }
-        if (e.burning < B.burnSeconds - 1e-9) return;
+        if (e.burning < B.burnSeconds - 1e-9 || sim.mirror) return;
         terrainKit.set(sim.terrain, e.col, e.row, 'path', 0);
         entityKit.remove(sim, e);
         emit(sim, 'burned', { target: e.id, at: space.toBlocks(e.x, e.y, 20) });
@@ -296,7 +304,7 @@ const propKit = (() => {
         return out;
     }
     function collect(sim, e, f) {
-        const bag = progressOf(sim).inventory;
+        const bag = bagOf(sim, f).inventory;
         if (e.item === 'gold') bag.gold += e.amount;
         else bag.items[e.item] = (bag.items[e.item] || 0) + e.amount;
         emit(sim, 'pickup', { side: f.id, item: e.item, amount: e.amount, at: space.toBlocks(e.x, e.y, e.h) });
@@ -311,7 +319,7 @@ const propKit = (() => {
             const dx = f.x - e.x, dy = f.y - e.y, d = Math.hypot(dx, dy), go = Math.min(d, D.pullSpeed * dt);
             if (d > 1e-9) { e.x += dx / d * go; e.y += dy / d * go; }
             e.h = Math.min(D.pullHeight, e.h + D.pullHeight * dt * 8);
-            if (d - go <= D.collectDistance) collect(sim, e, f);
+            if (d - go <= D.collectDistance && !sim.mirror) collect(sim, e, f);
             return;
         }
         if (e.t <= D.popSeconds + 1e-9) {
@@ -337,5 +345,5 @@ const propKit = (() => {
             else if (e.type === 'grave') tickGrave(sim, e, dt);
         }
     }
-    return { DIRS, angleOf, place, regrow, arrival, offer, use, drop, tick, doorOf, progressOf, nodeKey };
+    return { DIRS, angleOf, place, regrow, arrival, offer, use, drop, tick, doorOf, progressOf, bagOf, nodeKey };
 })();
