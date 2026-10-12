@@ -58,7 +58,9 @@ where the user decided them), `roadmap.md` (what was done, what is next,
 how to test in this container) and `ideas.md` (directions talked over and
 not yet decided). New decisions go into
 the matching section of `design.md`; an idea decided moves out of
-`ideas.md` into it. History starts anew on 2026-10-08; everything before
+`ideas.md` into it. `docs/notes/` (Chinese) holds notes that are not rules,
+one file per subject, kept out of `design.md` on purpose (user, 2026-10-09).
+History starts anew on 2026-10-08; everything before
 is the archived repository `Jyung99Red/pvp-game`, where the 2D version is
 tag `v1-2d` (commit `2a313c4`).
 This file only changes when project setup changes.
