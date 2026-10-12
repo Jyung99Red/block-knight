@@ -18,12 +18,12 @@ const equipmentModels = (() => {
         };
     }
     // A short blade: a small guard and a narrow, short blade.
-    function dagger(bladeLength = blade('assassin_dagger')) {
+    function dagger(bladeLength = blade('assassin_dagger'), { metal = 'steel', guard = 'steelDark', id = 'assassin_dagger' } = {}) {
         return {
-            id: 'assassin_dagger', mount: 'handR', parts: [
+            id, mount: 'handR', parts: [
                 { size: [0.06, 0.06, 0.22], at: [0, 0, 0.01], color: 'daggerGrip', kind: 'deco' },
-                { size: [0.22, 0.06, 0.06], at: [0, 0, 0.14], color: 'steelDark', kind: 'deco' },
-                { size: [0.09, 0.04, bladeLength], at: [0, 0, 0.17 + bladeLength / 2], color: 'steel', kind: 'weapon' }
+                { size: [0.22, 0.06, 0.06], at: [0, 0, 0.14], color: guard, kind: 'deco' },
+                { size: [0.09, 0.04, bladeLength], at: [0, 0, 0.17 + bladeLength / 2], color: metal, kind: 'weapon' }
             ]
         };
     }
@@ -63,33 +63,36 @@ const equipmentModels = (() => {
         };
     }
     // Iron armor: a breastplate, a belt plate and shoulder plates.
-    function ironArmor() {
+    function ironArmor(id = 'iron_armor', plate = 'steel') {
         return [
-            { id: 'iron_armor', mount: 'chest', parts: [
-                { size: [0.6, 0.34, 0.36], at: [0, 0.08, 0], color: 'steel', kind: 'deco' },
+            { id, mount: 'chest', parts: [
+                { size: [0.6, 0.34, 0.36], at: [0, 0.08, 0], color: plate, kind: 'deco' },
                 { size: [0.18, 0.12, 0.02], at: [0, 0.06, 0.185], color: 'steelDark', kind: 'deco' }
             ] },
-            { id: 'iron_armor', mount: 'shoulderR', parts: [{ size: [0.3, 0.12, 0.3], at: [0, 0.03, 0], color: 'steelDark', kind: 'deco' }] },
-            { id: 'iron_armor', mount: 'shoulderL', parts: [{ size: [0.3, 0.12, 0.3], at: [0, 0.03, 0], color: 'steelDark', kind: 'deco' }] }
+            { id, mount: 'shoulderR', parts: [{ size: [0.3, 0.12, 0.3], at: [0, 0.03, 0], color: 'steelDark', kind: 'deco' }] },
+            { id, mount: 'shoulderL', parts: [{ size: [0.3, 0.12, 0.3], at: [0, 0.03, 0], color: 'steelDark', kind: 'deco' }] }
         ];
     }
     const BUILDERS = {
         wooden_sword: () => sword(blade('wooden_sword')),
         iron_sword: () => sword(blade('iron_sword'), { metal: 'steel', guard: 'gold', id: 'iron_sword' }),
         steel_sword: () => sword(blade('steel_sword'), { metal: 'steelBright', guard: 'steelDark', id: 'steel_sword' }),
+        steel_dagger: () => dagger(blade('steel_dagger'), { metal: 'steelBright', guard: 'steelDark', id: 'steel_dagger' }),
         assassin_dagger: () => dagger(),
         wooden_shield: () => shield(),
         iron_shield: () => shield({ face: 'steelDark', band: 'steel', boss: 'gold', id: 'iron_shield' }),
+        steel_shield: () => shield({ face: 'steelBright', band: 'steelDark', boss: 'gold', id: 'steel_shield' }),
         torch: () => torch(),
         potion: () => flask(),
         cloth_armor: () => [],
         iron_armor: () => ironArmor(),
+        steel_armor: () => ironArmor('steel_armor', 'steelBright'),
         chief_charm: () => [],
         fang_necklace: () => [],
         stealth_ring: () => []
     };
     // Colour swaps a piece of armor makes (the cloth armor is the model's own).
-    const LOOKS = { iron_armor: { tunic: 'ironTunic', tunicTrim: 'steelDark' } };
+    const LOOKS = { iron_armor: { tunic: 'ironTunic', tunicTrim: 'steelDark' }, steel_armor: { tunic: 'steelTunic', tunicTrim: 'steelDark' } };
     // Items a body carries and wears, from a loadout { main, offhand, armor,
     // accessory }.
     function forLoadout(loadout) {

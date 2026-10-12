@@ -59,7 +59,7 @@ test('gear goes on only if owned and in its own slot; the main hand is never emp
     assert.equal(K.equip(p, 'offhand', 'torch'), '还没有');
     assert.equal(K.equip(p, 'offhand', 'potion'), '', 'a potion slot may be empty: the key greys out');
     assert.equal(K.equip(p, 'ring', 'chief_charm'), '没有这个装备栏');
-    assert.deepEqual(plain(K.gearFor('offhand')), ['potion', 'torch', 'wooden_shield', 'iron_shield']);
+    assert.deepEqual(plain(K.gearFor('offhand')), Object.keys(I).filter(id => I[id].slot === 'offhand'));
 });
 
 test('the shop sells potions (a few at most), a torch and the ring of stealth, and buys materials, one or all', () => {

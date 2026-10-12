@@ -362,13 +362,15 @@ const gameConfig = (() => {
             goblin_bone: { kind: 'material', name: '哥布林的骨', icon: '🦴', sell: 4, desc: '哥布林掉的。商店收。' },
             wolf_fang: { kind: 'material', name: '尖牙', icon: '🦷', sell: 5, desc: '野狼掉的。铁匠铺打造短刃要用，商店也收。' },
             wolf_claw: { kind: 'material', name: '狼爪', icon: '🐾', sell: 6, desc: '野狼掉的。商店收。' },
-            chief_tusk: { kind: 'material', name: '头目獠牙', icon: '🦷', sell: 30, desc: '哥布林头目的獠牙。能打成护符。' },
-            chief_crown: { kind: 'material', name: '头目的骨冠', icon: '👑', sell: 30, desc: '哥布林头目头上戴的骨冠。铁匠铺打钢剑要用，商店也收。' },
-            king_fang: { kind: 'material', name: '狼王之牙', icon: '🦴', sell: 40, desc: '狼王的牙。能打成项链。' },
-            king_mane: { kind: 'material', name: '狼王的鬃毛', icon: '🪶', sell: 40, desc: '狼王颈上的鬃毛。铁匠铺打钢剑要用，商店也收。' },
+            chief_tusk: { kind: 'material', name: '头目獠牙', icon: '🦷', sell: 30, desc: '哥布林头目的獠牙。能打成护符；打钢剑、钢盾也要用。' },
+            chief_crown: { kind: 'material', name: '头目的骨冠', icon: '👑', sell: 30, desc: '哥布林头目头上戴的骨冠。铁匠铺打钢短刃、钢甲要用，商店也收。' },
+            king_fang: { kind: 'material', name: '狼王之牙', icon: '🦴', sell: 40, desc: '狼王的牙。能打成项链；打钢剑、钢甲也要用。' },
+            king_mane: { kind: 'material', name: '狼王的鬃毛', icon: '🪶', sell: 40, desc: '狼王颈上的鬃毛。铁匠铺打钢短刃、钢盾要用，商店也收。' },
             minotaur_horn: { kind: 'material', name: '牛头人之角', icon: '🐂', sell: 50, desc: '石迷宫里牛头人的角。商店收。' },
             iron_ore: { kind: 'material', name: '铁矿石', icon: '🪨', sell: 3, desc: '原野和山谷的铁矿石块里采来的。铁匠铺打造铁器要用。' },
             crystal: { kind: 'material', name: '晶石', icon: '💎', sell: 10, desc: '千柱窟里采来的晶石。能镶在饰品上。' },
+            spider_fang: { kind: 'material', name: '蜘蛛毒牙', icon: '🕷️', sell: 6, desc: '洞穴蜘蛛掉的毒牙。铁匠铺打钢短刃要用，商店也收。' },
+            spider_shell: { kind: 'material', name: '蜘蛛硬壳', icon: '🐚', sell: 6, desc: '洞穴蜘蛛掉的硬壳。铁匠铺打钢盾要用，商店也收。' },
             spider_silk: { kind: 'material', name: '蛛丝', icon: '🕸️', sell: 5, desc: '千柱窟的洞穴蜘蛛掉的。商店收。' },
             herb: { kind: 'material', name: '草药', icon: '🌿', sell: 2, desc: '野外的草药丛采来的。能编进护符，商店也收。' },
             potion: { kind: 'supply', slot: 'offhand', offhand: 'potion', name: '药水', icon: '🧪', price: 15, max: 5, desc: '放在副手。按副手键喝一口，回复三成生命；挨打会洒掉这一口（药水还在）。' },
@@ -376,11 +378,14 @@ const gameConfig = (() => {
             wooden_sword: { kind: 'gear', slot: 'main', weapon: 'sword', name: '木剑', icon: '🗡️', stats: { atk: 8 }, blade: 0.92, max: 1, desc: '开局带着的剑。' },
             assassin_dagger: { kind: 'gear', slot: 'main', weapon: 'dagger', name: '刺客短刃', icon: '🔪', stats: { atk: 11 }, blade: 0.6, max: 1, recipe: { gold: 60, materials: { wolf_pelt: 2, iron_ore: 5, wolf_fang: 3 } }, desc: '短刃。比剑短，要贴得更近；出招快，连段最长六段，起手 B 是往前冲的突刺。' },
             iron_sword: { kind: 'gear', slot: 'main', weapon: 'sword', name: '铁剑', icon: '⚔️', stats: { atk: 16 }, blade: 0.92, max: 1, recipe: { gold: 80, materials: { iron_ore: 5, goblin_ear: 2 } }, desc: '和木剑一样长，铁打的刃，攻击高得多。' },
-            steel_sword: { kind: 'gear', slot: 'main', weapon: 'sword', name: '钢剑', icon: '🗡️', stats: { atk: 24 }, blade: 0.92, max: 1, recipe: { gold: 180, materials: { iron_sword: 1, iron_ore: 8, chief_tusk: 3, chief_crown: 2, king_fang: 3, king_mane: 2 } }, desc: '用铁剑重新锻成的钢剑，和铁剑一样长，攻击更高。打造时用掉那把铁剑。' },
+            steel_sword: { kind: 'gear', slot: 'main', weapon: 'sword', name: '钢剑', icon: '🗡️', stats: { atk: 24 }, blade: 0.92, max: 1, recipe: { gold: 180, materials: { iron_sword: 1, iron_ore: 8, chief_tusk: 2, king_fang: 2 } }, desc: '用铁剑重新锻成的钢剑，和铁剑一样长，攻击更高。打造时用掉那把铁剑。' },
+            steel_dagger: { kind: 'gear', slot: 'main', weapon: 'dagger', name: '钢短刃', icon: '🔪', stats: { atk: 17 }, blade: 0.6, max: 1, recipe: { gold: 150, materials: { assassin_dagger: 1, iron_ore: 6, chief_crown: 2, king_mane: 2, spider_fang: 2 } }, desc: '用刺客短刃重新锻成的钢刃，一样短一样快，攻击更高。打造时用掉那把短刃。' },
             wooden_shield: { kind: 'gear', slot: 'offhand', offhand: 'shield', name: '木盾', icon: '🛡️', stats: { def: 2 }, max: 1, desc: '开局带着的盾。按住格挡键用盾挡，比用武器挡更稳。' },
             iron_shield: { kind: 'gear', slot: 'offhand', offhand: 'shield', name: '铁盾', icon: '🔰', stats: { def: 6, guard: 30 }, max: 1, recipe: { gold: 80, materials: { iron_ore: 4, wolf_pelt: 2 } }, desc: '更结实的盾，格挡条更长。' },
+            steel_shield: { kind: 'gear', slot: 'offhand', offhand: 'shield', name: '钢盾', icon: '🔰', stats: { def: 10, guard: 60 }, max: 1, recipe: { gold: 150, materials: { iron_shield: 1, iron_ore: 6, chief_tusk: 1, king_mane: 2, spider_shell: 2 } }, desc: '用铁盾重新锻成的钢盾，格挡条更长。打造时用掉那面铁盾。' },
             cloth_armor: { kind: 'gear', slot: 'armor', name: '布甲', icon: '👕', stats: { def: 2, maxHp: 20 }, max: 1, desc: '开局穿着的衣服。' },
             iron_armor: { kind: 'gear', slot: 'armor', name: '铁甲', icon: '🥋', stats: { def: 7, maxHp: 40 }, max: 1, recipe: { gold: 100, materials: { iron_ore: 6, wolf_pelt: 3 } }, desc: '加了肩甲和胸甲。' },
+            steel_armor: { kind: 'gear', slot: 'armor', name: '钢甲', icon: '🥋', stats: { def: 12, maxHp: 60 }, max: 1, recipe: { gold: 180, materials: { iron_armor: 1, iron_ore: 8, chief_crown: 2, king_fang: 2, spider_silk: 3 } }, desc: '用铁甲重新锻成的钢甲，更厚的肩甲和胸甲。打造时用掉那件铁甲。' },
             chief_charm: { kind: 'gear', slot: 'accessory', name: '头目护符', icon: '📿', stats: { maxHp: 50 }, max: 1, recipe: { gold: 60, materials: { chief_tusk: 1, herb: 3 } }, desc: '用头目的獠牙打的护符。' },
             fang_necklace: { kind: 'gear', slot: 'accessory', name: '狼牙项链', icon: '🦷', stats: { atk: 4 }, max: 1, recipe: { gold: 60, materials: { king_fang: 1, crystal: 2 } }, desc: '用狼王的牙和晶石穿的项链。' },
             stealth_ring: { kind: 'gear', slot: 'accessory', name: '隐形戒指', icon: '💍', price: 150, max: 1, stealth: { cooldown: 5 }, desc: '戴在饰品栏。怪物察觉不到你；一出手就失效，脱战 5 秒后重新生效。' }
@@ -393,7 +398,7 @@ const gameConfig = (() => {
         loot: {
             goblin: [{ item: 'gold', chance: 1, amount: [2, 5] }, { pool: ['goblin_ear', 'goblin_fang', 'goblin_bone'], amount: [0, 2] }],
             wolf: [{ item: 'gold', chance: 1, amount: [2, 4] }, { pool: ['wolf_fang', 'wolf_pelt', 'wolf_claw'], amount: [0, 2] }],
-            spider: [{ item: 'gold', chance: 1, amount: [2, 4] }, { item: 'spider_silk', chance: 0.85, amount: [1, 2] }],
+            spider: [{ item: 'gold', chance: 1, amount: [2, 4] }, { pool: ['spider_silk', 'spider_fang', 'spider_shell'], amount: [0, 2] }],
             goblinChief: [{ item: 'gold', chance: 1, amount: [20, 30] }, { item: 'chief_tusk', chance: 1, amount: [1, 1] }, { item: 'chief_crown', chance: 1, amount: [1, 1] }],
             wolfKing: [{ item: 'gold', chance: 1, amount: [25, 35] }, { item: 'king_fang', chance: 1, amount: [1, 1] }, { item: 'king_mane', chance: 1, amount: [1, 1] }],
             minotaur: [{ item: 'gold', chance: 1, amount: [30, 40] }, { item: 'minotaur_horn', chance: 1, amount: [1, 1] }],
@@ -405,7 +410,7 @@ const gameConfig = (() => {
             // 20 of every material (user, 2026-10-08).
             cheatChest: [
                 { item: 'gold', chance: 1, amount: [500, 500] },
-                ...['iron_ore', 'wolf_pelt', 'goblin_ear', 'herb', 'crystal', 'spider_silk', 'chief_tusk', 'king_fang', 'minotaur_horn', 'goblin_fang', 'goblin_bone', 'wolf_fang', 'wolf_claw', 'chief_crown', 'king_mane'].map(item => ({ item, chance: 1, amount: [20, 20] }))
+                ...['iron_ore', 'wolf_pelt', 'goblin_ear', 'herb', 'crystal', 'spider_silk', 'chief_tusk', 'king_fang', 'minotaur_horn', 'goblin_fang', 'goblin_bone', 'wolf_fang', 'wolf_claw', 'chief_crown', 'king_mane', 'spider_fang', 'spider_shell'].map(item => ({ item, chance: 1, amount: [20, 20] }))
             ],
             ironOre: [{ item: 'iron_ore', chance: 1, amount: [1, 2] }],
             crystal: [{ item: 'crystal', chance: 1, amount: [1, 1] }],

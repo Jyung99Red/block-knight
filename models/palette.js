@@ -8,7 +8,7 @@ const palette = Object.freeze({
     rivalTunic: '#b8443a', rivalTrim: '#f0d9a8',
     belt: '#5b3b22', leather: '#7a5233', gold: '#d8b04a',
     // equipment
-    steel: '#dfe5ec', steelBright: '#b9d3f2', steelDark: '#9aa2aa', wood: '#8a5a2e', woodDark: '#6b4423',
+    steel: '#dfe5ec', steelBright: '#b9d3f2', steelTunic: '#7a8ea6', steelDark: '#9aa2aa', wood: '#8a5a2e', woodDark: '#6b4423',
     daggerGrip: '#3b2a1e', ironTunic: '#5f6b78', torchWrap: '#4a3a2a', flame: '#ffb13b', flameTip: '#fff1a8',
     potionRed: '#d8394a', glass: '#cfe6ef', cork: '#9a7246',
     // training dummy
