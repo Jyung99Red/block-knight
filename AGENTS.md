@@ -79,6 +79,14 @@ This file only changes when project setup changes.
   the picture and tuned numbers are the user's to judge, on the phone.
   A test checks logic: only that is worth writing, never a tuned number
   or a map's layout (user, 2026-10-09).
+  Keep it cheap (user, 2026-10-12): a change of tuned numbers alone
+  (`game_config.js` values, key poses) runs no tests; a logic change runs
+  the one or two test files of the code it touches, not all of them.
+  The browser smoke test is slow: run it only when the UI or start-up
+  changed, and then only the tests concerned (`--test-name-pattern`).
+  A test that breaks only because it wrote down a tuned number is
+  mended by reading the number from `gameConfig` or dropping the
+  assertion, never by writing in the new number.
   `tests/browser-smoke.test.cjs` needs Playwright: on Windows, install
   `playwright-core` anywhere and set `PLAYWRIGHT_MODULE` to it and
   `PLAYWRIGHT_CHANNEL=chrome`.
