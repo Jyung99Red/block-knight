@@ -1091,7 +1091,9 @@ const gameConfig = (() => {
         // rest of the network's timing is the duel's (pvp). A partner down
         // is picked up by holding the interact key over it reviveHold
         // seconds (user, 2026-10-10), with reviveHp of its HP (user), and
-        // gets up over riseSeconds.
-        coop: { snapshotSeconds: 0.1, beside: 48, reviveHold: 3, reviveHp: 0.1, riseSeconds: 0.8 }
+        // gets up over riseSeconds. Every adventure opens its room by
+        // itself (user, 2026-10-10); not opened (offline, the server
+        // down), it is tried again retrySeconds later.
+        coop: { snapshotSeconds: 0.1, beside: 48, reviveHold: 3, reviveHp: 0.1, riseSeconds: 0.8, retrySeconds: 30 }
     });
 })();

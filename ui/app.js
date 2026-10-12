@@ -16,10 +16,11 @@
 // controls; panels never pause it. A phone in the background does: the
 // session holds the fight till it is back. Left, it is the title screen
 // again, over the base.
-// A shared adventure (design.md 10; core/coop.js), from the same room
-// screen: a host opens a room in its own adventure and goes on in it, its
-// code on screen; a guest who comes joins this world, which then runs on
-// under every panel. Each goes its own way through the portals (user,
+// A shared adventure (design.md 10; core/coop.js): every adventure opens
+// a room by itself as it begins (user, 2026-10-10: alone it is a single
+// one), its code on screen, quietly tried again while it cannot; a guest
+// who comes (加入冒险 on its title screen, the room screen) joins this
+// world, which then runs on under every panel. Each goes its own way through the portals (user,
 // 2026-10-10): a guest in another region has a world of its own, run here
 // as well on the same progress (`apart`), till they meet again. A phone
 // that joins another's plays in that world (the session's copy) instead
@@ -109,6 +110,9 @@ const app = (() => {
         // session, link, code, ended, kept } -- this phone's room, open in
         // its own world (a guest in it or not), or this phone in another's.
         let coop = null;
+        // This adventure's room wanted open, and the try under way till it
+        // is ({ link, failed, retryAt }): `openRoom`.
+        let roomWanted = false, opening = null;
         const hosting = () => coop?.role === 'host', visiting = () => coop?.role === 'guest';
         // Someone else is in this phone's world: it runs on under any panel.
         const shared = () => hosting() && coop.session.guestIn;
@@ -185,7 +189,7 @@ const app = (() => {
         const display = hud.attach(root);
         display.reset(sim, 0);
         const room = roomScreen.attach(root, {
-            connected: c => c.mode === 'coop' ? (c.role === 'host' ? hostCoop(c) : visitCoop(c)) : beginDuel(c),
+            connected: c => c.mode === 'coop' ? visitCoop(c) : beginDuel(c),
             closed: () => title.open()
         });
         // A guest's deal is made on its copy of its bag at once, and by the host on the bag itself.
@@ -201,7 +205,8 @@ const app = (() => {
             progress: carried,
             player: me,
             gearLock: () => visiting() ? '联机时不能换装备' : !duel && mapId === 'base' ? '' : '只能在曙光村里换装备',
-            canPause: () => !coop,
+            canPause: () => !visiting() && !shared(),
+            room: roomShown,
             changed: () => persist(),
             act: name => {
                 menu.close();
@@ -222,11 +227,11 @@ const app = (() => {
                 if (name === 'continue') begin();
                 else if (name === 'new') { if (begun || saveKit.exists(storage())) openPanel('reset'); else begin(); }
                 else if (name === 'duel') room.open('duel');
-                else if (name === 'coop') room.open('coop');
+                else if (name === 'join') room.open('coop');
             }
         });
         function begin() {
-            begun = true;
+            begun = true; roomWanted = true;
             title.close();
             display.reset(sim, clock);
             loop.reset();
@@ -413,10 +418,41 @@ const app = (() => {
         }
 
         // ---- a shared adventure (design.md 10) ----
-        // Hosting: the room is open from now on, in this phone's own
-        // adventure (begun, if it was not); whoever comes joins it.
+        // The adventure's room (user, 2026-10-10: every adventure is open
+        // to a partner; alone, it is a single one): wanted from the
+        // adventure's start on the title screen till the way back to it,
+        // opened quietly; not opened (offline, the server down), it is
+        // tried again coop.retrySeconds later, and a code already taken
+        // at once. (`roomWanted`, `opening`: up with `coop`.)
+        function openRoom() {
+            const code = netLink.randomCode(), on = {};
+            const link = netLink.create({ open: () => on.open?.(), message: msg => on.message?.(msg), close: () => on.close?.() }, { room: 'coop' });
+            const mine = opening = { link, failed: false, retryAt: 0 };
+            link.host(code).then(() => {
+                if (opening !== mine) { link.close(); return; }
+                opening = null;
+                hostCoop({ link, code, on });
+            }, error => {
+                link.close();
+                if (opening === mine) Object.assign(mine, { failed: true, retryAt: clock + (error.code === 'taken' ? 0 : gameConfig.coop.retrySeconds) });
+            });
+        }
+        // The room as the menu shows it (user, 2026-10-10: its code there):
+        // { code, note }, or null with none.
+        function roomShown() {
+            const name = region => gameConfig.maps[region].name;
+            if (visiting()) { const m = coop.session.mate; return { code: coop.code, note: m ? `在房主的世界 · 房主在${name(m.region)}` : '在房主的世界里' }; }
+            if (hosting()) { const there = party.apart?.region; return { code: coop.code, note: there ? `同伴在${name(there)}` : shared() ? '同伴在这里' : '告诉对方这个房间号' }; }
+            if (opening) return { code: null, note: opening.failed ? '联机没连上，过一会儿再试' : '联机连接中…' };
+            return null;
+        }
+        function closeRoom() {
+            roomWanted = false;
+            opening?.link.close(); opening = null;
+            endCoop();
+        }
+        // Hosting: the room is open, in this phone's own adventure; whoever comes joins it.
         function hostCoop({ link, code, on }) {
-            input.releaseAll();
             const session = coopKit.host({
                 send: msg => link.send(msg), now: () => performance.now() / 1000,
                 world: () => partyKit.guestWorld(party) || sim, mate: () => party.apart ? { region: sim.region } : null,
@@ -426,6 +462,8 @@ const app = (() => {
                         told = { w: sim, key: sim.fighters.map(f => f.id).join() };
                         before = snapshot();
                         view?.load(sim);
+                        // (No pause with a partner in the world.)
+                        if (panel === 'pause') closePanel();
                         display.notice('同伴加入了', `房间 ${code}`, 2, clock);
                     },
                     part: reason => {
@@ -444,7 +482,6 @@ const app = (() => {
             on.open = () => session.open();
             on.message = msg => session.receive(msg);
             on.close = () => session.lost();
-            begin();
         }
         // Visiting: this phone plays in the host's world, its own standing
         // still; it brings its gear and what it carries.
@@ -504,10 +541,10 @@ const app = (() => {
             c.link.close();
             if (c.role === 'guest') load('base', { quiet: true });
         }
-        // The menu's 回到主界面: saved, and out of any shared adventure.
+        // The menu's 回到主界面: saved, and out of any shared adventure (its room closed).
         function toTitle() {
             input.releaseAll();
-            endCoop();
+            closeRoom();
             persist();
             title.open();
         }
@@ -552,6 +589,7 @@ const app = (() => {
             if (live()) duel.session.leave();
             if (hosting()) coop.session.close();
             else if (visiting()) { keepBag(); coop.session.leave(); }
+            opening?.link.close();
         });
         setInterval(() => { if (document.hidden && live()) duel.session.pulse(); if (document.hidden) coop?.session.pulse(); }, 1000);
         // The save is written whenever the page may be going away.
@@ -607,6 +645,8 @@ const app = (() => {
                 react(events);
                 if (theirs && party.apart === there) react(theirs, there);
                 if (hosting()) coop.session.frame();
+                // The adventure's room, opened (again) when it is not.
+                if (roomWanted && !coop && !duel && !title.isOpen() && (!opening || (opening.failed && clock >= opening.retryAt))) openRoom();
                 bodies = shownBodies(halted() ? 1 : loop.alpha());
                 if (saveAt !== null && clock >= saveAt) persist();
             }
@@ -615,7 +655,7 @@ const app = (() => {
             display.events(events, clock);
             // Where the partner is when not here: the guest apart, or the host away from the guest's world.
             const elsewhere = hosting() ? party.apart?.region : visiting() ? coop.session.mate?.region : null;
-            const together = coop && { role: coop.role, code: coop.code, partner: w.fighters.length > 1, elsewhere: elsewhere || null, waiting: coop.session.waiting, entering: visiting() && !coop.session.sim && !coop.ended };
+            const together = coop && { role: coop.role, partner: w.fighters.length > 1, elsewhere: elsewhere || null, waiting: coop.session.waiting, entering: visiting() && !coop.session.sim && !coop.ended };
             display.update(w, view, clock, bodies, { self, duel: s ? { countdown: s.countdown, phase: s.phase, waiting: s.waiting } : null, coop: together });
             // Portrait is covered by the rotate hint: skip drawing to save power.
             if (view && !portrait.matches) view.render(w, Math.min(seconds, simLoop.MAX_FRAME), { bodies, events, tour: title.isOpen(), yaw: input.yaw(), ...lens });

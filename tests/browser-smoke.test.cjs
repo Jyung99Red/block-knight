@@ -301,14 +301,15 @@ test('a drag across the picture turns the camera round the fighter (design.md 3.
 
 test('the world: the title screen, the base, through the north gate by touch, a fight, falling and home again; walls in front go see-through; back to the title and on; the save keeps it', { timeout: 300000 }, async t => {
     if (skip) { t.skip(skip); return; }
-    const { context, page, errors } = await openPhone(844, 390, '');
+    // (?link=local: the adventure's own room opens between this browser's tabs, not on the network.)
+    const { context, page, errors } = await openPhone(844, 390, '?link=local');
     try {
         // The page opens on the title screen (user, 2026-10-08): no save yet,
         // so no 继续冒险; the base behind it stands still and the HUD is away;
         // nothing is saved till the adventure begins. Its settings unfold
         // beside the keys and work as the menu's.
         const titleKeys = () => page.evaluate(() => [...document.querySelectorAll('[data-title-act]')].filter(b => !b.hidden).map(b => b.textContent));
-        assert.deepEqual(await titleKeys(), ['开始冒险', '联机冒险', '联机对战', '设置']);
+        assert.deepEqual(await titleKeys(), ['开始冒险', '加入冒险', '联机对战', '设置']);
         const newKey = () => page.evaluate(() => [...document.querySelector('[data-title-act="new"]').classList].filter(c => ['primary', 'danger'].includes(c)));
         assert.deepEqual(await newKey(), ['primary'], 'no save: 开始冒险 is the main key');
         const still = await page.evaluate(async () => {
@@ -377,7 +378,8 @@ test('the world: the title screen, the base, through the north gate by touch, a 
         });
         await page.waitForFunction(() => document.querySelector('[data-hud="interact"]').textContent === '进入' && document.querySelector('[data-hud="tag-name"]').textContent === '仓库', null, { timeout: 10000 });
         await page.touchscreen.tap(key.x, key.y);
-        await page.waitForFunction(() => window.game.menu.isOpen(), null, { timeout: 10000 });
+        // (The first frames of an adventure take seconds in software rendering.)
+        await page.waitForFunction(() => window.game.menu.isOpen(), null, { timeout: 60000 });
         // Worn: the three starter pieces, drawn from their models; the bag is otherwise empty.
         assert.deepEqual(await page.evaluate(() => [...document.querySelectorAll('[data-menu-slots] [data-item]')].map(e => [e.dataset.item, e.querySelector('img.item-icon')?.src.startsWith('data:image/png') || false])),
             [['wooden_sword', true], ['wooden_shield', true], ['cloth_armor', true]]);
@@ -481,7 +483,7 @@ test('the world: the title screen, the base, through the north gate by touch, a 
         const stood = await where();
         await page.click('[data-menu-act="title"]');
         assert.deepEqual([await page.evaluate(() => [window.game.title.isOpen(), window.game.menu.isOpen(), localStorage.getItem('block-knight-save') !== null]), await titleKeys()],
-            [[true, false, true], ['继续冒险', '新的冒险', '联机冒险', '联机对战', '设置']]);
+            [[true, false, true], ['继续冒险', '新的冒险', '加入冒险', '联机对战', '设置']]);
         assert.deepEqual(await newKey(), ['danger'], 'a save to erase: 新的冒险 is red (user, 2026-10-08)');
         await page.click('[data-title-act="new"]');
         assert.deepEqual(await page.evaluate(() => [window.game.panel, document.querySelector('[data-panel-title]').textContent]), ['reset', '开始新的冒险？']);
@@ -498,7 +500,7 @@ test('the world: the title screen, the base, through the north gate by touch, a 
         await page.reload({ waitUntil: 'load' });
         await page.waitForFunction(() => document.documentElement.dataset.clientState === 'ready' && window.game, null, { timeout: 120000 });
         assert.deepEqual(await page.evaluate(() => [window.game.map, window.game.sim.progress.inventory.gold, window.game.save.inventory.items.wolf_pelt]), ['base', 42, 2]);
-        assert.deepEqual(await titleKeys(), ['继续冒险', '新的冒险', '联机冒险', '联机对战', '设置']);
+        assert.deepEqual(await titleKeys(), ['继续冒险', '新的冒险', '加入冒险', '联机对战', '设置']);
         // A new adventure, agreed to: the save is erased, the base is begun afresh.
         await page.click('[data-title-act="new"]'); await page.click('[data-action="erase"]');
         assert.deepEqual(await page.evaluate(() => [window.game.title.isOpen(), window.game.panel, window.game.map, window.game.sim.progress.inventory.gold, localStorage.getItem('block-knight-save')]), [false, null, 'base', 0, null]);
@@ -517,7 +519,8 @@ test('the world: the title screen, the base, through the north gate by touch, a 
 
 test('items: the smithy makes iron armor, the bag puts it on (the model changes), the shop sells a potion that heals', { timeout: 300000 }, async t => {
     if (skip) { t.skip(skip); return; }
-    const { context, page, errors } = await openPhone(844, 390, '');
+    // (?link=local: the adventure's own room opens between this browser's tabs, not on the network.)
+    const { context, page, errors } = await openPhone(844, 390, '?link=local');
     try {
         await page.click('[data-title-act="new"]');
         const door = kind => page.evaluate(k => {
@@ -528,7 +531,8 @@ test('items: the smithy makes iron armor, the bag puts it on (the model changes)
         // The smithy, through its door.
         await door('smithy');
         await page.keyboard.press('KeyE'); await page.evaluate(() => window.game.run(0.02));
-        await page.waitForFunction(() => window.game.screens.kind === 'smithy', null, { timeout: 10000 });
+        // (The first frames of an adventure take seconds in software rendering.)
+        await page.waitForFunction(() => window.game.screens.kind === 'smithy', null, { timeout: 60000 });
         await page.click('[data-row="iron_armor"]');
         await shot(page, 'smithy');
         await page.click('[data-act="craft"]');
@@ -685,7 +689,7 @@ test('two phones in one browser (?link=local): a room code, a duel to a result, 
     } finally { await context.close(); }
 });
 
-test('two phones in one browser (?link=local): a shared adventure -- the host plays on with the room code on screen, the guest joins its world, takes home what it picks up, and leaves', { timeout: 300000 }, async t => {
+test('two phones in one browser (?link=local): a shared adventure -- every adventure opens a room, its code on screen; the guest joins its world, takes home what it picks up, and leaves', { timeout: 300000 }, async t => {
     if (skip) { t.skip(skip); return; }
     const context = await browser.newContext({ viewport: { width: 844, height: 390 }, hasTouch: true, isMobile: true, deviceScaleFactor: 1 });
     try {
@@ -694,24 +698,26 @@ test('two phones in one browser (?link=local): a shared adventure -- the host pl
         // (The menu's figure is a renderer of its own, made the first time it
         // opens: in software that stalls the page past the other's patience.)
         await B.page.evaluate(() => { window.game.menu.open(); window.game.menu.close(); });
-        // A creates a room: no weapon to pick; it goes straight into its own
-        // adventure, the code on screen (design.md 10).
-        await A.page.click('[data-title-act="coop"]');
-        assert.equal(await text(A.page, '[data-room-title]'), '联机冒险');
-        assert.equal(await A.page.evaluate(() => document.querySelector('[data-room-weapons]').hidden), true);
-        await A.page.click('[data-room-action="host"]');
-        await A.page.waitForFunction(() => window.game.coop && !window.game.title.isOpen() && !window.game.room.isOpen(), null, { timeout: 20000 });
-        const label = await text(A.page, '[data-hud="room"]'), code = label.match(/\d{4}/)?.[0];
-        assert.match(label, /^房间 \d{4} · 等人加入$/);
-        await shot(A.page, 'coop-host-waiting');
-        // B types it and joins A's world, beside A.
-        await B.page.click('[data-title-act="coop"]');
-        await B.page.click('[data-room-action="join"]');
+        // A begins its adventure: its room opens by itself, the code in the
+        // menu (design.md 10; user, 2026-10-10).
+        await A.page.click('[data-title-act="new"]');
+        await A.page.waitForFunction(() => window.game.coop?.role === 'host', null, { timeout: 30000 });
+        const roomOf = page => page.evaluate(() => [document.querySelector('[data-menu-room]').hidden, document.querySelector('[data-menu-room-code]').textContent, document.querySelector('[data-menu-room-note]').textContent]);
+        await A.page.click('[data-menu]');
+        const [hidden, code, note] = await roomOf(A.page);
+        assert.equal(hidden, false); assert.match(code, /^\d{4}$/); assert.match(note, /告诉对方/);
+        await shot(A.page, 'coop-host-menu');
+        await A.page.click('[data-menu-act="close"]');
+        // B types it on 加入冒险's keypad (no weapon to pick) and joins A's world, beside A.
+        await B.page.click('[data-title-act="join"]');
+        assert.deepEqual(await B.page.evaluate(() => [document.querySelector('[data-room-title]').textContent, document.querySelector('[data-room-weapons]').hidden, window.game.room.step]), ['加入冒险', true, 'join']);
         for (const d of code) await B.page.click(`[data-key="${d}"]`);
         await B.page.click('[data-room-action="connect"]');
         await B.page.waitForFunction(() => window.game.coop?.sim, null, { timeout: 30000 });
         await A.page.waitForFunction(() => window.game.sim.fighters.length === 2, null, { timeout: 30000 });
-        assert.match(await text(A.page, '[data-hud="room"]'), /同伴在这里/);
+        await A.page.click('[data-menu]');
+        assert.deepEqual(await roomOf(A.page), [false, code, '同伴在这里']);
+        await A.page.click('[data-menu-act="close"]');
         assert.deepEqual(await B.page.evaluate(() => [window.game.map, window.game.coop.selfId, window.game.sim.fighters.map(f => f.id)]), ['base', 'guest', ['player', 'guest']]);
         await shot(B.page, 'coop-guest');
         // Loot at B's feet in A's world flies to B: B's bag, not A's.
@@ -722,14 +728,20 @@ test('two phones in one browser (?link=local): a shared adventure -- the host pl
         const got = await B.page.evaluate(() => window.game.coop.bag.inventory.gold);
         assert.ok(got > 0);
         // B leaves from the menu (no pause in a shared adventure): back to its
-        // own title screen, with what it got; A plays on alone, the room open.
+        // own title screen, with what it got; A plays on alone, the room open,
+        // the pause there again.
         await B.page.click('[data-menu]');
         assert.equal(await B.page.evaluate(() => document.querySelector('[data-menu-act="pause"]').hidden), true);
+        assert.deepEqual(await roomOf(B.page), [false, code, '在房主的世界里']);
         await B.page.click('[data-menu-act="title"]');
         assert.deepEqual(await B.page.evaluate(() => [window.game.map, window.game.coop, window.game.title.isOpen(), window.game.sim.progress.inventory.gold]), ['base', null, true, got]);
         await A.page.waitForFunction(() => window.game.sim.fighters.length === 1, null, { timeout: 30000 });
-        // (The HUD says so at the next frame.)
-        await A.page.waitForFunction(() => /等人加入/.test(document.querySelector('[data-hud="room"]').textContent), null, { timeout: 30000 });
+        await A.page.click('[data-menu]');
+        assert.equal(await A.page.evaluate(() => document.querySelector('[data-menu-act="pause"]').hidden), false);
+        assert.match((await roomOf(A.page))[2], /告诉对方/);
+        // Back to the title, the room is closed.
+        await A.page.click('[data-menu-act="title"]');
+        assert.equal(await A.page.evaluate(() => window.game.coop), null);
         assert.deepEqual(A.errors, []); assert.deepEqual(B.errors, []);
     } finally { await context.close(); }
 });

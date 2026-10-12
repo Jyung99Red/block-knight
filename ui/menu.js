@@ -8,7 +8,9 @@
 // column) and the bag beside them, the picked item below (one bag: the
 // base's storage opens this too), gear changed in the base only
 // (design.md 7.2) and not by a guest in another's world (design.md 10).
-// No pause in a shared adventure: the world is two players'. The settings page takes its place: this phone's
+// No pause in a shared adventure: the world is two players'. The side shows
+// the adventure's room (design.md 10): its code for the one who joins, and
+// who is in. The settings page takes its place: this phone's
 // settings (ui/settings_view.js). The menu opens on the character page
 // every time (user, 2026-10-08). The close key has the corner to itself.
 // Gear changes go through core/inventory.js on the world's progress and
@@ -22,7 +24,7 @@ const menuScreen = (() => {
     // hooks: progress() what this phone's fighter carries (the world's
     // progress, or a guest's bag); player() the fighter shown (HP);
     // gearLock() why gear may not be changed now ('' when it may);
-    // canPause(); changed('gear'); act(name) for the side's buttons
+    // canPause(); room() the room's { code, note }, or null; changed('gear'); act(name) for the side's buttons
     // (pause, title); closed({ gearChanged }).
     function attach(root, hooks) {
         const el = root.querySelector('[data-menu-screen]'), $ = sel => el.querySelector(sel);
@@ -30,6 +32,7 @@ const menuScreen = (() => {
         const hpFill = $('[data-menu-hp]'), hpText = $('[data-menu-hp-text]'), statsEl = $('[data-menu-stats]');
         const settingsPage = settingsView.attach($('[data-menu-settings]'), { prefix: 'menu-setting' });
         const acts = Object.fromEntries([...el.querySelectorAll('[data-menu-act]')].map(b => [b.dataset.menuAct, b]));
+        const roomEl = $('[data-menu-room]'), roomCode = $('[data-menu-room-code]'), roomNote = $('[data-menu-room-note]');
         const tabs = [...el.querySelectorAll('[data-menu-page]')], pages = [...el.querySelectorAll('[data-menu-page-body]')];
         const I = gameConfig.items;
         let open = false, picked = null, message = '', gearChanged = false, raf = 0, drag = null, fig = null, shownHp = '', page = 'role';
@@ -91,6 +94,15 @@ const menuScreen = (() => {
             detailEl.innerHTML = detail();
             life(true);
         }
+        // The room, which goes on changing under the open menu too (someone comes, goes, the room opens).
+        let shownRoom = '';
+        function room() {
+            const r = hooks.room?.() || null, text = r ? `${r.code || ''}|${r.note}` : '';
+            if (text === shownRoom) return;
+            shownRoom = text;
+            roomEl.hidden = !r;
+            roomCode.textContent = r?.code || ''; roomNote.textContent = r?.note || '';
+        }
         // HP goes on changing under the open menu.
         function life(force = false) {
             const f = hooks.player(), text = `${Math.ceil(f.hp)} / ${f.maxHp}`;
@@ -106,7 +118,7 @@ const menuScreen = (() => {
                 fig.size(r.width, r.height);
                 fig.frame(now / 1000);
             }
-            life();
+            life(); room();
             raf = requestAnimationFrame(tick);
         }
 
@@ -115,6 +127,7 @@ const menuScreen = (() => {
             open = true; picked = null; message = ''; gearChanged = false; page = 'role';
             el.hidden = false;
             acts.pause.hidden = !hooks.canPause();
+            shownRoom = null; room();
             fig = figureView.figure();
             if (fig && fig.canvas.parentNode !== figureBox) figureBox.prepend(fig.canvas);
             figureBox.classList.toggle('none', !fig);

@@ -9,13 +9,13 @@
 // region's name as it is entered, a banner when a boss falls, and what is
 // picked up. In a duel: the rival's HP in the foe panel and over its head,
 // the countdown, and an arrow at the edge of the screen while the rival is
-// in sight but off it. In a shared adventure (design.md 10): the room's
-// code (the host's, for the other phone to type), the partner's HP over
-// its head and the arrow to it, a line while this one is down waiting to
-// be picked up or the world waits for the host, and one as it is picked
-// up. What is carried (gold, potions) is this fighter's own (its bag, else
-// the progress: as core/props.js bagOf). Reads the simulation; never
-// writes it.
+// in sight but off it. In a shared adventure (design.md 10): where the
+// partner is when in another region (the room's code is the menu's), the
+// partner's HP over its head and the arrow to it, a line while this one
+// is down waiting to be picked up or the world waits for the host, and
+// one as it is picked up. What is carried (gold, potions) is this
+// fighter's own (its bag, else the progress: as core/props.js bagOf).
+// Reads the simulation; never writes it.
 const hud = (() => {
     const FIGHTING = monsterKit.FIGHTING;
     // What a world with nothing carried shows (a duel).
@@ -49,7 +49,7 @@ const hud = (() => {
             floats: $('[data-hud="floats"]'), mobs: $('[data-hud="mobs"]'), banner: $('[data-hud="banner"]'), arrow: $('[data-hud="arrow"]'),
             boss: $('[data-hud="boss"]'), key: $('[data-button="interact"]'), keyText: $('[data-hud="interact"]'),
             tag: $('[data-hud="tag"]'), hold: $('[data-hud="hold"]'), tagName: $('[data-hud="tag-name"]'), tagWhy: $('[data-hud="tag-why"]'), toasts: $('[data-hud="toasts"]'),
-            room: $('[data-hud="room"]'), giveUp: $('[data-giveup]'), region: $('[data-hud="region"]'), regionTitle: $('[data-hud="region-title"]'), regionNote: $('[data-hud="region-note"]'),
+            giveUp: $('[data-giveup]'), region: $('[data-hud="region"]'), regionTitle: $('[data-hud="region-title"]'), regionNote: $('[data-hud="region-note"]'),
             guardKey: $('[data-button="guard"]'), offhand: $('[data-button="offhand"]'), offhandCount: $('[data-hud="offhand-count"]'),
             clock: $('[data-hud="clock"]'), clockRing: $('[data-hud="clock-ring"]'), clockHand: $('[data-hud="clock-hand"]')
         };
@@ -172,7 +172,7 @@ const hud = (() => {
             }
         }
         // duel (optional): { countdown, phase, waiting } from the duel
-        // session. coop (optional): { role: 'host' | 'guest', code, partner
+        // session. coop (optional): { role: 'host' | 'guest', partner
         // (someone else is in the world), elsewhere (the region the partner
         // is in, when another), waiting ('peer': the host is in the
         // background), entering (the host's world not here yet) }.
@@ -197,12 +197,9 @@ const hud = (() => {
             // The region and what is carried.
             const map = gameConfig.maps[sim.region];
             els.goal.hidden = !!sim.duel || !map;
-            if (!els.goal.hidden) els.goal.textContent = map.training ? map.name : `${map.name} · ${gameConfig.items.gold.icon} ${bag.inventory.gold}`;
-            els.room.hidden = !coop;
-            if (coop) {
-                const there = coop.elsewhere ? gameConfig.maps[coop.elsewhere].name : '';
-                els.room.textContent = coop.role === 'host' ? `房间 ${coop.code} · ${there ? `同伴在${there}` : coop.partner ? '同伴在这里' : '等人加入'}` : `联机 · 房间 ${coop.code}${there ? ` · 房主在${there}` : ''}`;
-            }
+            // (With the partner in another region: where.)
+            const there = coop?.elsewhere ? ` · ${coop.role === 'host' ? '同伴' : '房主'}在${gameConfig.maps[coop.elsewhere].name}` : '';
+            if (!els.goal.hidden) els.goal.textContent = map.training ? map.name + there : `${map.name} · ${gameConfig.items.gold.icon} ${bag.inventory.gold}${there}`;
             // The clock: the hour the world is drawn at, to a quarter of a
             // degree; the sun or the moon, whichever is up.
             const hour = view?.hour ? view.hour(sim) : dayKit.hourOf(sim), turn = Math.round(dialAngle(hour) * 4) / 4;

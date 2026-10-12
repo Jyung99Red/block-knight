@@ -1,14 +1,15 @@
 // The title screen (design.md 3.6; user, 2026-10-08): the page opens on
 // it, over the base dimmed and standing still. 继续冒险 when there is a
 // save; 新的冒险 (开始冒险 without one: a save is erased only once asked);
-// the shared adventure's room and the duel's (ui/room.js); this phone's settings, unfolded beside the keys
+// 加入冒险, into another's adventure, and the duel's room (ui/room.js);
+// this phone's settings, unfolded beside the keys
 // (ui/settings_view.js). No 退出: a page cannot close itself, and a phone
 // leaves a game by its own gesture; the menu's 回到主界面 comes back here.
 // Behind it the camera goes from one thing of the region to another,
 // picked at random (render/world_view.js), the picture going dark at each
 // cut (`dim`).
 const titleScreen = (() => {
-    // hooks: saved() a save exists; act(name) for continue, new, coop and duel.
+    // hooks: saved() a save exists; act(name) for continue, new, join and duel.
     function attach(root, hooks) {
         const el = root.querySelector('[data-title]');
         const keys = Object.fromEntries([...el.querySelectorAll('[data-title-act]')].map(b => [b.dataset.titleAct, b]));

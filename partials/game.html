@@ -39,7 +39,6 @@
                 <div class="bar bar-hp"><i data-hud="hp"></i></div>
                 <div class="bar bar-guard" data-hud="guard-bar"><i data-hud="guard"></i></div>
                 <div class="hud-goal" data-hud="goal" hidden></div>
-                <div class="hud-goal hud-room" data-hud="room" hidden></div>
             </div>
         </div>
         <div class="hud-combo" data-hud="combo" aria-live="off">
@@ -76,7 +75,7 @@
             <div class="title-keys">
                 <button type="button" class="primary" data-title-act="continue">继续冒险</button>
                 <button type="button" data-title-act="new">新的冒险</button>
-                <button type="button" data-title-act="coop">联机冒险</button>
+                <button type="button" data-title-act="join">加入冒险</button>
                 <button type="button" data-title-act="duel">联机对战</button>
                 <button type="button" data-title-act="settings" aria-expanded="false" aria-controls="title-settings">设置</button>
             </div>
@@ -121,6 +120,7 @@
                     <button type="button" role="tab" data-menu-page="role" aria-controls="menu-page-role" aria-selected="true">角色</button>
                     <button type="button" role="tab" data-menu-page="settings" aria-controls="menu-page-settings" aria-selected="false">设置</button>
                 </div>
+                <div class="menu-room" data-menu-room hidden><b data-menu-room-code></b><span data-menu-room-note></span></div>
                 <button type="button" data-menu-act="pause">暂停</button>
                 <button type="button" class="menu-title" data-menu-act="title">回到主界面</button>
             </section>
