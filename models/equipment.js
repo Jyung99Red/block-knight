@@ -76,6 +76,7 @@ const equipmentModels = (() => {
     const BUILDERS = {
         wooden_sword: () => sword(blade('wooden_sword')),
         iron_sword: () => sword(blade('iron_sword'), { metal: 'steel', guard: 'gold', id: 'iron_sword' }),
+        steel_sword: () => sword(blade('steel_sword'), { metal: 'steelBright', guard: 'steelDark', id: 'steel_sword' }),
         assassin_dagger: () => dagger(),
         wooden_shield: () => shield(),
         iron_shield: () => shield({ face: 'steelDark', band: 'steel', boss: 'gold', id: 'iron_shield' }),

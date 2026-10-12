@@ -450,7 +450,7 @@ test('a monster down drops its loot; it pops out, settles, and flies to whoever 
     assert.equal(m.phase, 'dead');
     const drops = sim.entities.filter(e => e.type === 'drop');
     assert.ok(drops.some(d => d.item === 'gold'), 'gold always');
-    assert.ok(drops.every(d => d.item === 'gold' || d.item === 'goblin_ear'));
+    assert.ok(drops.every(d => gameConfig.loot.goblin.some(l => l.item === d.item || l.pool?.includes(d.item))));
     // The same seed drops the same.
     assert.deepEqual(plain(kill(7).sim.entities.filter(e => e.type === 'drop').map(d => [d.item, d.amount])), plain(drops.map(d => [d.item, d.amount])));
     // Walk away first: nothing comes along.
@@ -553,7 +553,7 @@ test('a boss\'s grave: none while it stands; it shows where the boss stood once 
         put(q, back.x - 60, back.y, 0); back.phase = 'patrol'; back.rest = 99;
         tap(down); step(down, 0.3);
         assert.equal(back.phase, 'dead');
-        assert.ok(down.entities.some(e => e.type === 'drop' && gameConfig.loot[MON[kind].loot].some(l => l.item === e.item && l.item !== 'gold')), 'its own loot');
+        assert.ok(down.entities.some(e => e.type === 'drop' && gameConfig.loot[MON[kind].loot].some(l => (l.item === e.item && l.item !== 'gold') || l.pool?.includes(e.item))), 'its own loot');
         assert.deepEqual([down.progress.bosses[kind], down.progress.revived[kind]], [true, undefined]);
         step(down, G.graveAfter + 0.1);
         assert.equal(stone.state, 'ready', 'its grave is back');

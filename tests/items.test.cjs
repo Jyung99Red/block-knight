@@ -6,7 +6,7 @@ const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const { load } = require('./load.cjs');
 const g = load();
-const { worldSim: W, inventoryKit: K, saveKit, interactKit, terrainKit: T, rigKit: R, playerAnim, combatKit, space, gameConfig, playerModel, equipmentModels, dummyKit } = g;
+const { worldSim: W, inventoryKit: K, saveKit, interactKit, terrainKit: T, rigKit: R, playerAnim, combatKit, space, gameConfig, playerModel, equipmentModels, dummyKit, propKit } = g;
 const I = gameConfig.items, F = gameConfig.combat, MOVES = gameConfig.combo.moves, U = gameConfig.world.unitsPerBlock;
 const plain = value => JSON.parse(JSON.stringify(value));
 const step = (sim, seconds) => { for (let i = 0; i < Math.round(seconds / 0.01); i++) W.step(sim, 0.01); };
@@ -93,7 +93,7 @@ test('the shop sells potions (a few at most), a torch and the ring of stealth, a
     assert.equal(K.equip(p, 'accessory', 'stealth_ring'), '');
     assert.deepEqual(plain(K.stealthOf(p.loadout)), { cooldown: 5 });
     assert.ok(!K.recipes().includes('stealth_ring'), 'the smithy does not make it');
-    assert.deepEqual(plain(K.wanted()), ['goblin_ear', 'wolf_pelt', 'chief_tusk', 'king_fang', 'minotaur_horn', 'iron_ore', 'crystal', 'spider_silk', 'herb']);
+    assert.deepEqual(plain(K.wanted()), Object.keys(gameConfig.items).filter(id => gameConfig.items[id].kind === 'material'));
 });
 
 test('the smithy makes gear from materials and gold, once each', () => {
@@ -112,6 +112,38 @@ test('the smithy makes gear from materials and gold, once each', () => {
     // The boss trophies go into the accessories.
     assert.equal(I.chief_charm.recipe.materials.chief_tusk, 1);
     assert.equal(I.fang_necklace.recipe.materials.king_fang, 1);
+});
+
+test('an upgrade uses up the piece it is made from, and a worn one hands its place to the new piece', () => {
+    const p = fresh(), r = I.steel_sword.recipe, from = Object.keys(r.materials).find(id => I[id].kind === 'gear');
+    assert.ok(from, 'the steel sword is made from a sword');
+    p.inventory.gold = r.gold;
+    for (const [id, n] of Object.entries(r.materials)) p.inventory.items[id] = n;
+    p.loadout.main = from;
+    assert.equal(K.craft(p, 'steel_sword'), '');
+    assert.equal(K.count(p, from), 0);
+    assert.equal(p.loadout.main, 'steel_sword');
+    // Worn or not, the main hand is never left without a weapon.
+    assert.equal(K.craft(p, 'steel_sword'), '已经有了');
+    assert.ok(K.itemOf(p.loadout.main));
+});
+
+test('a pool entry of a loot table drops that many picks of its items, and the same seed drops the same', () => {
+    const rolled = seed => {
+        const sim = W.create({ region: 'field', seed });
+        return plain(propKit.drop(sim, 'wolf', 0, 0).map(d => [d.item, d.amount]));
+    };
+    const pool = gameConfig.loot.wolf.find(l => l.pool), seen = new Set();
+    for (let seed = 1; seed < 60; seed++) {
+        const got = rolled(seed).filter(([item]) => item !== 'gold');
+        const n = got.reduce((sum, [, amount]) => sum + amount, 0);
+        assert.ok(n >= pool.amount[0] && n <= pool.amount[1], `seed ${seed}: ${n} picks`);
+        assert.ok(got.every(([item]) => pool.pool.includes(item)));
+        assert.equal(new Set(got.map(([item]) => item)).size, got.length, 'one drop per item');
+        for (const [item] of got) seen.add(item);
+    }
+    assert.deepEqual([...seen].sort(), [...pool.pool].sort(), 'every item of the pool comes up');
+    assert.deepEqual(rolled(5), rolled(5));
 });
 
 // ---- reach comes from the blade ----

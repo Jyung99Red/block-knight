@@ -99,7 +99,13 @@ const inventoryKit = (() => {
     }
     function craft(progress, id) {
         const why = canCraft(progress, id);
-        if (!why) { for (const n of needs(progress, id)) give(progress, n.id, -n.need); give(progress, id, 1); }
+        if (!why) {
+            for (const n of needs(progress, id)) give(progress, n.id, -n.need);
+            give(progress, id, 1);
+            // A piece used up as material (an upgrade) that was worn gives its place to the new one.
+            const worn = progress.loadout[itemOf(id).slot];
+            if (worn && !count(progress, worn) && itemOf(worn)?.kind !== 'supply') progress.loadout[itemOf(id).slot] = id;
+        }
         return why;
     }
     // Ids by kind, in catalogue order: what the shop sells, what it buys,

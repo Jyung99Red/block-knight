@@ -289,15 +289,27 @@ const propKit = (() => {
 
     // ---- loot ----
     // Roll loot table `table` and drop what comes up at (x, y): each entry
-    // that hits pops out as one drop, in a direction of its own.
+    // that hits pops out as one drop, in a direction of its own. A pool
+    // entry picks an item of its pool for each of its amount; the same
+    // item picked twice is one drop of two.
     function drop(sim, table, x, y) {
         const D = gameConfig.drops, out = [];
+        const roll = ([lo, hi]) => lo + Math.floor(entityKit.random(sim) * (hi - lo + 1));
+        const hits = [];
         for (const entry of gameConfig.loot[table] || []) {
-            if (entityKit.random(sim) >= entry.chance) continue;
-            const [lo, hi] = entry.amount, amount = lo + Math.floor(entityKit.random(sim) * (hi - lo + 1));
+            if (entry.pool) {
+                const got = new Map();
+                for (let n = roll(entry.amount); n > 0; n--) {
+                    const item = entry.pool[Math.floor(entityKit.random(sim) * entry.pool.length)];
+                    got.set(item, (got.get(item) || 0) + 1);
+                }
+                for (const [item, amount] of got) hits.push({ item, amount });
+            } else if (entityKit.random(sim) < entry.chance) hits.push({ item: entry.item, amount: roll(entry.amount) });
+        }
+        for (const { item, amount } of hits) {
             const a = entityKit.random(sim) * Math.PI * 2, v = D.popSpeed[0] + entityKit.random(sim) * (D.popSpeed[1] - D.popSpeed[0]);
             out.push(entityKit.add(sim, {
-                id: entityKit.nextId(sim, 'd'), type: 'drop', item: entry.item, amount, x, y, h: 0, facing: a,
+                id: entityKit.nextId(sim, 'd'), type: 'drop', item, amount, x, y, h: 0, facing: a,
                 radius: D.radius, solid: false, vx: Math.cos(a) * v, vy: Math.sin(a) * v, t: 0, pull: null
             }));
         }
