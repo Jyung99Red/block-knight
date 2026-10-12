@@ -320,12 +320,13 @@ const gameConfig = (() => {
             // The minotaur (石迷宫; user, 2026-10-12): a boss of its own
             // skeleton, its shield held before it for good. shield: a blow
             // from within the guard's front arc (the player's own,
-            // combat.guard.frontAngle) does `taken` of its damage (half:
-            // user); from the side or behind, all of it.
+            // combat.guard.frontAngle) does `taken` of its damage (a third:
+            // user, 9 lands as 3; it was half); from the side or behind,
+            // all of it. Bigger than first drawn, and harder (user).
             minotaur: {
-                name: '牛头人', scale: 1.35, boss: true, loot: 'minotaur', stagger: 10, revive: { goblin_ear: 4, wolf_pelt: 4 },
-                shield: { taken: 0.5 },
-                maxHp: 450, atk: 64, def: 5, radius: 22, speed: 50, turnRate: 2.4, trackTurn: 1.3,
+                name: '牛头人', scale: 1.6, boss: true, loot: 'minotaur', stagger: 10, revive: { goblin_ear: 4, wolf_pelt: 4 },
+                shield: { taken: 1 / 3 },
+                maxHp: 450, atk: 75, def: 5, radius: 26, speed: 50, turnRate: 2.4, trackTurn: 1.3,
                 patrolRadius: 0, patrolSpeed: 16, patrolRest: 2, alertRange: 200, alertSeconds: 0.8, leash: 380, standOff: 0.85,
                 firstDelay: 0.5, delay: 0.6, flinchSeconds: 0.18, enrage: { threshold: 0.5, atk: 1.25, tempo: 1.2 },
                 moves: {
