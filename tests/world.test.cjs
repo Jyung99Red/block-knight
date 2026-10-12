@@ -494,8 +494,7 @@ test('the goblin chief: a bigger goblin; down, it stays down, and the gate and c
 test('a boss\'s grave: none while it stands; it shows where the boss stood once its body has sunk, and called with the materials it asks it glows, then the boss rises out of the ground and fights again (user, 2026-10-07)', () => {
     const H = gameConfig.interact.graveHold, G = gameConfig.props, RISE = MON.riseSeconds;
     for (const [region, kind] of [['field', 'goblinChief'], ['valley', 'wolfKing']]) {
-        const cost = Object.entries(MON[kind].revive), [[need, n]] = cost, name = MON[kind].name;
-        assert.equal(cost.length, 1, `${kind} asks for one material`);
+        const cost = Object.entries(MON[kind].revive), [need, n] = cost[0], name = MON[kind].name;
         // Standing, it has no grave to speak of: hidden, not in the way, offering nothing.
         const sim = W.create({ region }), p = sim.player, boss = sim.monsters.find(m => m.kind === kind), grave = sim.entities.find(e => e.type === 'grave');
         const home = T.cellCentre(sim.terrain, ...(({ col, row }) => [col, row])(sim.terrain.monsters.find(m => m.kind === kind)));
@@ -513,6 +512,7 @@ test('a boss\'s grave: none while it stands; it shows where the boss stood once 
         // In a region whose boss the save has down, it is there from the start; materials short, it says what is missing.
         const save = saveKit.fresh();
         save.bosses[kind] = true; save.inventory.items[need] = n - 1;
+        for (const [id, k] of cost.slice(1)) save.inventory.items[id] = k;
         const down = W.create({ region, progress: save }), q = down.player, stone = down.entities.find(e => e.type === 'grave');
         assert.equal(down.monsters.some(m => m.kind === kind), false);
         assert.equal(stone.state, 'ready');
@@ -521,6 +521,7 @@ test('a boss\'s grave: none while it stands; it shows where the boss stood once 
         assert.deepEqual(plain(interactKit.target(down, q).offer), { verb: '复活', name: `${name}之墓`, hold: H, ready: false, why: `要${gameConfig.items[need].name} ×${n}（有 ${n - 1}）` });
         // Enough: held for graveHold, the materials are spent and it glows; nothing more to offer.
         down.progress.inventory.items[need] = n + 2;
+        for (const [id, k] of cost.slice(1)) down.progress.inventory.items[id] = k + 2;
         press(down, 'interact'); step(down, H + 0.02); release(down, 'interact');
         assert.equal(stone.state, 'calling');
         assert.equal(down.progress.inventory.items[need], 2, 'the materials are spent');
@@ -585,9 +586,10 @@ test('a boss\'s grave: none while it stands; it shows where the boss stood once 
 
 test('a boss called back is back at once: a region left while its grave glows has it at home on the way back, the materials spent once (user, 2026-10-08)', () => {
     const H = gameConfig.interact.graveHold, G = gameConfig.props;
-    const kind = 'goblinChief', [[need, n]] = Object.entries(MON[kind].revive);
+    const kind = 'goblinChief', cost = Object.entries(MON[kind].revive), [need, n] = cost[0];
     const save = saveKit.fresh();
     save.bosses[kind] = true; save.inventory.items[need] = n + 1;
+    for (const [id, k] of cost.slice(1)) save.inventory.items[id] = k + 1;
     const sim = W.create({ region: 'field', progress: save }), p = sim.player, grave = sim.entities.find(e => e.type === 'grave');
     before(p, grave, Math.PI / 2, 40); step(sim, 0.02);
     press(sim, 'interact'); step(sim, H + 0.02); release(sim, 'interact');

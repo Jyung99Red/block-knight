@@ -291,7 +291,7 @@ const gameConfig = (() => {
                 mid: { spring: 1, approach: 2 }
             },
             goblinChief: {
-                name: '哥布林头目', model: 'goblin', scale: 1.45, look: 'chief', boss: true, loot: 'goblinChief', stagger: 10, revive: { goblin_ear: 6 },
+                name: '哥布林头目', model: 'goblin', scale: 1.45, look: 'chief', boss: true, loot: 'goblinChief', stagger: 10, revive: { goblin_ear: 2, goblin_fang: 2, goblin_bone: 2 },
                 maxHp: 450, atk: 51, def: 5, radius: 18, speed: 50, turnRate: 2.6, trackTurn: 1.4,
                 patrolRadius: 0, patrolSpeed: 16, patrolRest: 2, alertRange: 190, alertSeconds: 0.7, leash: 360, standOff: 0.85,
                 firstDelay: 0.5, delay: 0.6, flinchSeconds: 0.18, enrage: { threshold: 0.5, atk: 1.25, tempo: 1.2 },
@@ -304,7 +304,7 @@ const gameConfig = (() => {
                 mid: { pounce: 1, approach: 2 }
             },
             wolfKing: {
-                name: '狼王', model: 'wolf', scale: 1.4, look: 'king', boss: true, loot: 'wolfKing', stagger: 10, revive: { wolf_pelt: 6 },
+                name: '狼王', model: 'wolf', scale: 1.4, look: 'king', boss: true, loot: 'wolfKing', stagger: 10, revive: { wolf_fang: 2, wolf_pelt: 2, wolf_claw: 2 },
                 maxHp: 420, atk: 65, def: 4, radius: 22, speed: 88, turnRate: 3, trackTurn: 1.8,
                 patrolRadius: 0, patrolSpeed: 22, patrolRest: 2, alertRange: 210, alertSeconds: 0.6, leash: 380, standOff: 0.85,
                 firstDelay: 0.4, delay: 0.5, flinchSeconds: 0.18, enrage: { threshold: 0.5, atk: 1.25, tempo: 1.25 },
@@ -324,7 +324,7 @@ const gameConfig = (() => {
             // user, 9 lands as 3; it was half); from the side or behind,
             // all of it. Bigger than first drawn, and harder (user).
             minotaur: {
-                name: '牛头人', scale: 1.6, boss: true, loot: 'minotaur', stagger: 10, revive: { goblin_ear: 4, wolf_pelt: 4 },
+                name: '牛头人', scale: 1.6, boss: true, loot: 'minotaur', stagger: 10, revive: { goblin_ear: 2, goblin_fang: 1, goblin_bone: 1, wolf_fang: 1, wolf_pelt: 2, wolf_claw: 1 },
                 shield: { taken: 1 / 3 },
                 maxHp: 450, atk: 75, def: 5, radius: 26, speed: 50, turnRate: 2.4, trackTurn: 1.3,
                 patrolRadius: 0, patrolSpeed: 16, patrolRest: 2, alertRange: 200, alertSeconds: 0.8, leash: 380, standOff: 0.85,
