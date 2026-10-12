@@ -78,8 +78,6 @@ const worldSim = (() => {
             const at = spots[i], other = spots[1 - i];
             return fighter(id, gear[i], at, duel ? Math.atan2(other.y - at.y, other.x - at.x) : entry ? entry.facing : Math.PI / 2, !duel && !!map.training);
         });
-        // A duel is fought on pvp.maxHp, whatever the gear makes.
-        if (duel) for (const f of fighters) f.hp = f.maxHp = gameConfig.pvp.maxHp;
         if (carry && Number.isFinite(carry.hp)) fighters[0].hp = Math.max(1, Math.min(fighters[0].maxHp, Math.round(carry.hp)));
         const saved = progress || {};
         // clock: seconds played (outside duels), which grows resources back.

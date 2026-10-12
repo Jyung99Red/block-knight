@@ -58,8 +58,9 @@ const gameConfig = (() => {
         // 4b. Fighting rules shared by every fight (training, PVE, PVP).
         // fighters.base: the main character's stats before equipment (no
         // levels: equipment is the only growth, design.md 7.1); each
-        // item worn adds its own (`items`). The starter gear makes 360 HP,
-        // 30 ATK, 8 DEF; a duel is always fought in it.
+        // item worn adds its own (`items`). The starter gear makes 200 HP
+        // (user, 2026-10-12; it was 360), 30 ATK, 8 DEF; a duel is always
+        // fought in it.
         // hitStun: a hit that is not guarded freezes the one struck's
         // controls this long. weaponPad: weapon boxes grow by this much on
         // every side for hit tests only (design.md 4.3).
@@ -72,7 +73,7 @@ const gameConfig = (() => {
         // player, blocks and parries. Stagger: points from moves (and
         // `parry`) fill to `threshold`, then the target reels `duration`.
         combat: {
-            fighters: { base: { maxHp: 340, atk: 22, def: 4 } },
+            fighters: { base: { maxHp: 180, atk: 22, def: 4 } },
             hitStun: 0.35, weaponPad: 8,
             damage: { defenseConstant: 17.5, parryAtkRatio: 0.5 },
             impact: { hitstop: { hit: 0.06, block: 0.04, parry: 0.08 }, knockback: { hit: 10, block: 5, parry: 8 }, knockbackSeconds: 0.12 },
@@ -1082,10 +1083,8 @@ const gameConfig = (() => {
         // connectSeconds: how long finding the other phone may take.
         // weapons: the main hands each side may pick before a duel (user
         // 2026-10-02: one of each weapon type); the rest is gear.starter.
-        // maxHp: both duellists' HP, whatever the gear makes (user,
-        // 2026-10-12: the starter's 360 made duels too long).
         pvp: {
-            maxHp: 200, countdown: 3, snapshotSeconds: 0.05, heartbeatSeconds: 0.25, timeoutSeconds: 5, awaySeconds: 60,
+            countdown: 3, snapshotSeconds: 0.05, heartbeatSeconds: 0.25, timeoutSeconds: 5, awaySeconds: 60,
             replaySeconds: 0.25, latencySeconds: 0.15, steer: 0.1, resyncSeconds: 0.1, historyEvents: 128, connectSeconds: 12,
             weapons: ['wooden_sword', 'assassin_dagger']
         },

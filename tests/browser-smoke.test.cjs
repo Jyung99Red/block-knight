@@ -458,7 +458,7 @@ test('the world: the title screen, the base, through the north gate by touch, a 
         assert.equal(await page.evaluate(() => document.querySelector('[data-panel-title]').textContent), '倒下了');
         await shot(page, 'fallen');
         await page.click('[data-action="home"]');
-        assert.deepEqual(await page.evaluate(() => [window.game.map, window.game.panel, window.game.sim.player.hp, window.game.sim.result]), ['base', null, 360, null]);
+        assert.deepEqual(await page.evaluate(() => [window.game.map, window.game.panel, window.game.sim.player.hp === window.game.sim.player.maxHp, window.game.sim.result]), ['base', null, true, null]);
         // The menu: no way home from it (user, 2026-10-02). It opens on the
         // character page; the settings page takes its place, a key picks a
         // choice; opened again it is the character page (user, 2026-10-08).

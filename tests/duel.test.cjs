@@ -23,7 +23,7 @@ const step = (sim, seconds, opts) => { for (let i = 0; i < Math.round(seconds / 
 const tap = (sim, who, button = 'attack') => { W.command(sim, { type: 'press', button }, who); W.command(sim, { type: 'release', button }, who); };
 
 test('a duel: two mortal fighters with the same stats, on the arena spawns, face to face, in sight', () => {
-    const sim = duel(), [h, g] = sim.fighters, S = { ...inventoryKit.statsOf(inventoryKit.starter()), maxHp: gameConfig.pvp.maxHp };
+    const sim = duel(), [h, g] = sim.fighters, S = inventoryKit.statsOf(inventoryKit.starter());
     assert.deepEqual(plain(sim.fighters.map(f => f.id)), ['host', 'guest']);
     assert.equal(sim.player, h, 'sim.player is the first fighter');
     for (const f of sim.fighters) {
@@ -326,7 +326,7 @@ test('only the host changes HP; the guest sees it with the next snapshot', () =>
     const hp = () => p.guest.sim.fighters.map(f => f.hp);
     press(p.guest, 'attack'); release(p.guest, 'attack');
     for (let i = 0; i < 25; i++) p.guest.frame(0.01);
-    const full = gameConfig.pvp.maxHp;
+    const full = inventoryKit.statsOf(inventoryKit.starter()).maxHp;
     assert.deepEqual(plain(hp()), [full, full], 'the guest\'s own cut decides nothing');
     p.run(0.4);
     assert.ok(p.host.sim.fighters[0].hp < full);
