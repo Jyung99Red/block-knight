@@ -353,14 +353,14 @@ test('every blow can be blocked, with the shield or with the weapon, raised reac
             const flip = either(kind, name);
             for (const d of [lo, hi]) {
                 const where = `${kind} ${name} from ${(d / U).toFixed(2)} blocks`;
-                for (const off of [0, MON.turnFirst]) for (const enraged of [false, true]) {
+                for (const off of [0, MON.turnFirst]) for (const enraged of S.enrage ? [false, true] : [false]) {
                     // A quick blow met by a guard just up is parried, which is fine too. A
                     // move drawn either way round comes the other way when enraged.
                     const s = face(kind, name, d, off, { enraged, flip: flip && enraged, act: guardAt(REACT) });
                     assert.ok(s.hurt === 0 && s.blocks + s.parries === 1, `${where}, ${off.toFixed(2)} off${enraged ? ', enraged' : ''}: ${JSON.stringify(s)}`);
                 }
                 // A torch in the offhand: the weapon guards (weaker, a shorter parry window).
-                const w = face(kind, name, d, MON.turnFirst, { enraged: true, loadout: TORCH, act: guardAt(REACT) });
+                const w = face(kind, name, d, MON.turnFirst, { enraged: !!S.enrage, loadout: TORCH, act: guardAt(REACT) });
                 assert.ok(w.hurt === 0 && w.blocks + w.parries === 1, `${where} with the weapon: ${JSON.stringify(w)}`);
             }
             // Raised just in time for the parry window, it parries -- the weapon's narrower one too.
@@ -560,7 +560,7 @@ test('a wall in the way is walked round, looking where it goes, to fight on the 
         assert.ok(backwards < 30, `${kind} walked backwards for ${backwards} steps`);
         assert.ok(seconds < 600 / MON[kind].speed, `${kind} took ${seconds.toFixed(1)} s`);
         // The player gone and the wall between it and home: round it again, and whole.
-        Object.assign(m, { phase: 'return', hp: 1, enraged: true });
+        Object.assign(m, { phase: 'return', hp: 1, enraged: !!MON[kind].enrage });
         put(m, HOME.x - 200, HOME.y); put(p, 100, 100);
         step(sim, 600 / MON[kind].speed);
         assert.equal(m.phase, 'patrol', `${kind} never got home`);
@@ -653,13 +653,12 @@ test('a patrol passes over waypoints in a wall instead of walking at it', () => 
     assert.ok(far < 4 && pressed < 30, `strayed ${far.toFixed(1)}, stood pressing for ${pressed} steps`);
 });
 
-test('enraged below its threshold: harder blows and a faster clock, for good', () => {
-    const S = MON.wolf, mv = S.moves.bite;
+test('a boss enraged below its threshold: harder blows and a faster clock, for good; small monsters do not enrage (user, 2026-10-12)', () => {
+    const S = MON.goblinChief, mv = S.moves.flail;
     const timeToHit = enraged => {
-        const sim = field('wolf'), m = sim.monsters[0], p = sim.player;
-        stand(m, 600, 400, 0); put(p, 650, 400, Math.PI);
-        m.phase = 'chase'; m.wait = 0;
-        if (enraged) { m.hp = Math.floor(m.maxHp * S.enrage.threshold); m.enraged = true; }
+        const sim = open('goblinChief'), p = sim.player, m = ready(sim, 50);
+        Object.assign(m, { phase: 'windup', move: 'flail', t: 0, enraged });
+        if (enraged) m.hp = Math.floor(m.maxHp * S.enrage.threshold);
         const hp = p.hp;
         for (let i = 0; i < 300 && p.hp === hp; i++) W.step(sim, 0.01);
         return { time: sim.time, damage: hp - p.hp };
@@ -670,9 +669,9 @@ test('enraged below its threshold: harder blows and a faster clock, for good', (
     assert.equal(calm.damage, hit(S.atk * mv.ratio));
     assert.equal(wild.damage, hit(S.atk * mv.ratio * S.enrage.atk));
     // The player's hits set it off at the threshold.
-    const sim = field('goblin'), m = sim.monsters[0];
+    const sim = open('goblinChief'), m = sim.monsters[0];
     put(sim.player, m.x - STANDARD, m.y, 0); m.wait = 99;
-    m.hp = Math.ceil(m.maxHp * MON.goblin.enrage.threshold) + 2;
+    m.hp = Math.ceil(m.maxHp * MON.goblinChief.enrage.threshold) + 2;
     tap(sim); step(sim, 0.3);
     assert.ok(m.enraged && events(sim, 'enrage').length === 1);
 });

@@ -228,8 +228,9 @@ const gameConfig = (() => {
         // from home it walks back home, wherever the player is, and a blow
         // on the way does not turn it round (user, 2026-10-06); walking
         // home it mends returnHeal of its HP a second (user, 2026-10-06).
-        // At enrage.threshold of its HP it enrages for good: damage times
-        // enrage.atk, its whole clock (cooldowns too) times enrage.tempo.
+        // A boss (and only a boss: user, 2026-10-12) at enrage.threshold
+        // of its HP enrages for good: damage times enrage.atk, its whole
+        // clock (cooldowns too) times enrage.tempo.
         // HP is the old value times the old hpScale 3, and so is ATK, to
         // keep the old danger (the 2D version). Moves, by name (the key
         // poses of the same name, or of `pose`): seconds; ratio per ATK;
@@ -256,9 +257,9 @@ const gameConfig = (() => {
         monsters: {
             corpseSeconds: 2.5, riseSeconds: 1.2, approachSeconds: 0.8, turnFirst: Math.PI / 4, reactSeconds: 0.35, packStandOff: 1.5, returnHeal: 0.3,
             goblin: {
-                name: '哥布林', loot: 'goblin', maxHp: 105, atk: 36, def: 3, radius: 12, speed: 54, turnRate: 3, trackTurn: 1.6,
+                name: '哥布林', loot: 'goblin', maxHp: 105, atk: 26, def: 3, radius: 12, speed: 54, turnRate: 3, trackTurn: 1.6,
                 patrolRadius: 60, patrolSpeed: 16, patrolRest: 1.4, alertRange: 150, alertSeconds: 0.5, leash: 260, standOff: 0.85,
-                firstDelay: 0.3, delay: 0.45, flinchSeconds: 0.22, enrage: { threshold: 0.3, atk: 1.3, tempo: 1.2 },
+                firstDelay: 0.3, delay: 0.45, flinchSeconds: 0.22,
                 moves: {
                     flail: { name: '乱挥', windup: 0.85, lock: 0.35, swing: 0.16, recovery: 1.45, ratio: 0.6, step: 8 },
                     pounce: { name: '猛扑', windup: 1.35, lock: 0.4, swing: 0.2, recovery: 2.0, ratio: 0.9, step: 36, cooldown: 5 }
@@ -267,9 +268,9 @@ const gameConfig = (() => {
                 mid: { pounce: 1, approach: 2 }
             },
             wolf: {
-                name: '野狼', loot: 'wolf', maxHp: 90, atk: 54, def: 2, radius: 16, speed: 78, turnRate: 3, trackTurn: 1.6,
+                name: '野狼', loot: 'wolf', maxHp: 90, atk: 34, def: 2, radius: 16, speed: 78, turnRate: 3, trackTurn: 1.6,
                 patrolRadius: 80, patrolSpeed: 22, patrolRest: 1.0, alertRange: 180, alertSeconds: 0.4, leash: 300, standOff: 0.85, pack: 2,
-                firstDelay: 0.3, delay: 0.45, flinchSeconds: 0.22, enrage: { threshold: 0.3, atk: 1.3, tempo: 1.2 },
+                firstDelay: 0.3, delay: 0.45, flinchSeconds: 0.22,
                 moves: {
                     bite: { name: '撕咬', windup: 0.72, lock: 0.17, swing: 0.16, recovery: 1.1, ratio: 0.6, step: 35 },
                     leap: { name: '扑击', windup: 1.25, lock: 0.35, swing: 0.54, recovery: 2.2, ratio: 0.9, step: 150, ram: true, cooldown: 6 }
@@ -279,9 +280,9 @@ const gameConfig = (() => {
             },
             // The cave spider (千柱窟): low and quick on its legs, little HP.
             spider: {
-                name: '洞穴蜘蛛', loot: 'spider', maxHp: 80, atk: 44, def: 2, radius: 16, speed: 70, turnRate: 3.4, trackTurn: 1.8,
+                name: '洞穴蜘蛛', loot: 'spider', maxHp: 80, atk: 42, def: 2, radius: 16, speed: 70, turnRate: 3.4, trackTurn: 1.8,
                 patrolRadius: 60, patrolSpeed: 20, patrolRest: 1.6, alertRange: 150, alertSeconds: 0.4, leash: 280, standOff: 0.85,
-                firstDelay: 0.3, delay: 0.45, flinchSeconds: 0.22, enrage: { threshold: 0.3, atk: 1.3, tempo: 1.2 },
+                firstDelay: 0.3, delay: 0.45, flinchSeconds: 0.22,
                 moves: {
                     strike: { name: '刺足', windup: 0.8, lock: 0.3, swing: 0.14, recovery: 1.4, ratio: 0.6, step: 40 },
                     spring: { name: '跳扑', windup: 1.2, lock: 0.35, swing: 0.42, recovery: 2.2, ratio: 0.85, step: 110, ram: true, cooldown: 5 }
@@ -291,7 +292,7 @@ const gameConfig = (() => {
             },
             goblinChief: {
                 name: '哥布林头目', model: 'goblin', scale: 1.45, look: 'chief', boss: true, loot: 'goblinChief', stagger: 10, revive: { goblin_ear: 6 },
-                maxHp: 450, atk: 48, def: 5, radius: 18, speed: 50, turnRate: 2.6, trackTurn: 1.4,
+                maxHp: 450, atk: 51, def: 5, radius: 18, speed: 50, turnRate: 2.6, trackTurn: 1.4,
                 patrolRadius: 0, patrolSpeed: 16, patrolRest: 2, alertRange: 190, alertSeconds: 0.7, leash: 360, standOff: 0.85,
                 firstDelay: 0.5, delay: 0.6, flinchSeconds: 0.18, enrage: { threshold: 0.5, atk: 1.25, tempo: 1.2 },
                 moves: {
@@ -304,7 +305,7 @@ const gameConfig = (() => {
             },
             wolfKing: {
                 name: '狼王', model: 'wolf', scale: 1.4, look: 'king', boss: true, loot: 'wolfKing', stagger: 10, revive: { wolf_pelt: 6 },
-                maxHp: 420, atk: 60, def: 4, radius: 22, speed: 88, turnRate: 3, trackTurn: 1.8,
+                maxHp: 420, atk: 65, def: 4, radius: 22, speed: 88, turnRate: 3, trackTurn: 1.8,
                 patrolRadius: 0, patrolSpeed: 22, patrolRest: 2, alertRange: 210, alertSeconds: 0.6, leash: 380, standOff: 0.85,
                 firstDelay: 0.4, delay: 0.5, flinchSeconds: 0.18, enrage: { threshold: 0.5, atk: 1.25, tempo: 1.25 },
                 moves: {
