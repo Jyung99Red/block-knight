@@ -347,7 +347,8 @@ const gameConfig = (() => {
         // only their colours differ: user 2026-10-02); an offhand item's
         // `offhand` is what it is for: a shield is what the guard key guards
         // with (the weapon guards without one), a torch or a potion is used
-        // with the offhand key. An accessory's `stealth` keeps monsters
+        // with the offhand key (a torch burns `burn` seconds lit, then the
+        // next one in the bag takes over: user, 2026-10-12). An accessory's `stealth` keeps monsters
         // from noticing its wearer (user, 2026-10-06): starting an attack
         // gives the wearer away, and `cooldown` seconds with no monster in
         // a fight hide them again. `max`:
@@ -374,7 +375,8 @@ const gameConfig = (() => {
             spider_silk: { kind: 'material', name: '蛛丝', icon: '🕸️', sell: 5, desc: '千柱窟的洞穴蜘蛛掉的。商店收。' },
             herb: { kind: 'material', name: '草药', icon: '🌿', sell: 2, desc: '野外的草药丛采来的。能编进护符，商店也收。' },
             potion: { kind: 'supply', slot: 'offhand', offhand: 'potion', name: '药水', icon: '🧪', price: 15, max: 5, desc: '放在副手。按副手键喝一口，回复三成生命；挨打会洒掉这一口（药水还在）。' },
-            torch: { kind: 'gear', slot: 'offhand', offhand: 'torch', name: '火把', icon: '🔥', price: 30, max: 1, desc: '放在副手。按副手键点燃或熄灭，照亮暗处；带着它对枯木丛按交互键就能烧掉。拿着火把时只能用武器挡，也不能拿火把打。' },
+            torch: { kind: 'supply', slot: 'offhand', offhand: 'torch', name: '火把', icon: '🔥', price: 10, max: 10, burn: 300, desc: '放在副手，背包里可以带 10 支。按副手键点燃或熄灭，照亮暗处；点着才烧，一支烧 5 分钟，烧完自动换下一支。带着它对枯木丛按交互键就能烧掉。拿着火把时只能用武器挡，也不能拿火把打。' },
+            wood: { kind: 'material', name: '木材', icon: '🪵', sell: 2, desc: '原野树边的柴堆里拾来的。在营地扎营要用，商店也收。' },
             wooden_sword: { kind: 'gear', slot: 'main', weapon: 'sword', name: '木剑', icon: '🗡️', stats: { atk: 8 }, blade: 0.92, max: 1, desc: '开局带着的剑。' },
             assassin_dagger: { kind: 'gear', slot: 'main', weapon: 'dagger', name: '刺客短刃', icon: '🔪', stats: { atk: 11 }, blade: 0.6, max: 1, recipe: { gold: 60, materials: { wolf_pelt: 2, iron_ore: 5, wolf_fang: 3 } }, desc: '短刃。比剑短，要贴得更近；出招快，连段最长六段，起手 B 是往前冲的突刺。' },
             iron_sword: { kind: 'gear', slot: 'main', weapon: 'sword', name: '铁剑', icon: '⚔️', stats: { atk: 16 }, blade: 0.92, max: 1, recipe: { gold: 80, materials: { iron_ore: 5, goblin_ear: 2 } }, desc: '和木剑一样长，铁打的刃，攻击高得多。' },
@@ -410,11 +412,12 @@ const gameConfig = (() => {
             // 20 of every material (user, 2026-10-08).
             cheatChest: [
                 { item: 'gold', chance: 1, amount: [500, 500] },
-                ...['iron_ore', 'wolf_pelt', 'goblin_ear', 'herb', 'crystal', 'spider_silk', 'chief_tusk', 'king_fang', 'minotaur_horn', 'goblin_fang', 'goblin_bone', 'wolf_fang', 'wolf_claw', 'chief_crown', 'king_mane', 'spider_fang', 'spider_shell'].map(item => ({ item, chance: 1, amount: [20, 20] }))
+                ...['iron_ore', 'wood', 'wolf_pelt', 'goblin_ear', 'herb', 'crystal', 'spider_silk', 'chief_tusk', 'king_fang', 'minotaur_horn', 'goblin_fang', 'goblin_bone', 'wolf_fang', 'wolf_claw', 'chief_crown', 'king_mane', 'spider_fang', 'spider_shell'].map(item => ({ item, chance: 1, amount: [20, 20] }))
             ],
             ironOre: [{ item: 'iron_ore', chance: 1, amount: [1, 2] }],
             crystal: [{ item: 'crystal', chance: 1, amount: [1, 1] }],
-            herb: [{ item: 'herb', chance: 1, amount: [1, 2] }]
+            herb: [{ item: 'herb', chance: 1, amount: [1, 2] }],
+            logs: [{ item: 'wood', chance: 1, amount: [1, 2] }]
         },
         // Loot on the ground (world units, seconds). It pops out at
         // popSpeed[0..1] and up to popHeight over popSeconds, lies still,
@@ -450,8 +453,14 @@ const gameConfig = (() => {
             regrowSeconds: 300,
             ore: { name: '铁矿', verb: '采矿', hold: 1.0, loot: 'ironOre' },
             crystal: { name: '晶石', verb: '采矿', hold: 1.2, loot: 'crystal' },
-            herb: { name: '草药', verb: '采集', hold: 0.4, loot: 'herb' }
+            herb: { name: '草药', verb: '采集', hold: 0.4, loot: 'herb' },
+            log: { name: '柴堆', verb: '拾柴', hold: 0.6, loot: 'logs' }
         },
+        // A camp (user, 2026-10-12): `hold` seconds with the interact key,
+        // `wood` pieces of firewood spent, `heal` of the max HP back, the
+        // gear may be changed; the fire burns `burn` seconds after (drawn),
+        // `radius` is the firepit's body (it is in the way).
+        camp: { hold: 2, wood: 3, heal: 1 / 3, burn: 40, radius: 14 },
         // Buildings of the base: name, the interact key's verb, and what it
         // does -- `rest` refills HP, `open` opens the building's panel.
         buildings: {
@@ -767,7 +776,8 @@ const gameConfig = (() => {
         // pillar (3 high), `P` a portal's opening, `B` a dry thicket (2
         // high), `*` a hedge (1 high, seen over: a map's soft edge), `O` iron
         // ore and `X` crystal (1-high boulders), `h` a herb
-        // (walked through), `C` a chest, `@` grass
+        // (walked through), `L` a pile of firewood (1 high), `C` a chest,
+        // `F` a camp, `@` grass
         // where the player starts when not arriving through a portal (a
         // duel: the host on the first, the guest on the second, in reading
         // order), `D` the training dummy (facing `dummyFacing`, radians),
@@ -781,7 +791,7 @@ const gameConfig = (() => {
         // depth] over its H blocks, door: side, south by default}),
         // `portals` ({ at: [col, row] of its P, to: map, facing: the side
         // that leads into this map, requires: a boss to be down first }),
-        // `chests` ({ at, loot, requires }). Someone arriving stands in front
+        // `chests` ({ at, loot, requires }), `camps` ({ at }). Someone arriving stands in front
         // of the portal that leads back. `training`: nobody falls there (an
         // emptied HP bar refills); elsewhere the player can fall. `safe`: no
         // monsters. `duel`: the map is for PVP only. `dark`: no daylight,
@@ -863,11 +873,11 @@ const gameConfig = (() => {
                     '4431................1131.........11......3.....:.......3___',
                     '4331..................1..............T...3.....:.....C.3___',
                     '4321...23O...............................3..1..:.......3___',
-                    '5321....2...............T..............T.3.....:.......3___',
+                    '5321....2...............TL............LT.3.....:.......3___',
                     '4321.............w.......................3......G......3___',
                     '4321.....................................3.............3___',
                     '4321.....................................3.............3___',
-                    '64421......T.................h..T........3.........1...3___',
+                    '64421......TL................h..TL.......3.........1...3___',
                     '654321...................................3.............3___',
                     '54321....................................3.............3___',
                     '4321....................h...............333333..33333333___',
@@ -887,11 +897,11 @@ const gameConfig = (() => {
                     '4321.......:::::.......................................____',
                     '54321......:::..........................................___',
                     '4321......::........................h..............O....___',
-                    '5331......::..................g.................w......____',
+                    '5331......::..................g.................w...LT.____',
                     '4321......::..h...1O.................................._____',
-                    '4321......::.@...................................h...._____',
-                    '4321......::...................1.......................____',
-                    '5321......::................1....1......................___',
+                    '4321......::.@................................T..h.F.._____',
+                    '4321......::...................1..............L........____',
+                    '5321......::................1....1............g....LT...___',
                     '4321++++2#P#2++++++++++++++++++++++++++++++++++++++++++____',
                     '4331...................................................____',
                     '4331.................................................._____',
@@ -901,7 +911,10 @@ const gameConfig = (() => {
                     { at: [10, 36], to: 'base', facing: 'north' },
                     { at: [48, 3], to: 'valley', facing: 'south', requires: 'goblinChief' }
                 ],
-                chests: [{ at: [53, 5], loot: 'chiefChest', requires: 'goblinChief' }]
+                chests: [{ at: [53, 5], loot: 'chiefChest', requires: 'goblinChief' }],
+                // A camp in the south-east corner (user, 2026-10-12), a wolf
+                // and a goblin left to guard it, firewood by the trees.
+                camps: [{ at: [51, 33] }]
             },
             // The second region, the way from the field to the cave (the
             // second draft of the redrawn map: user, 2026-10-04; no gate to

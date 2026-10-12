@@ -157,7 +157,7 @@ const viewLight = (() => {
         // (A doorway's glow only in a dark region: `doorways`, below.)
         const doorways = dark ? sim.entities.filter(e => e.type === 'portal').map(e => space.toBlocks(e.x + Math.cos(e.facing) * DOORWAY.inside * U, e.y + Math.sin(e.facing) * DOORWAY.inside * U, 0)).map(([x, , z]) => [x, DOORWAY.height, z]) : [];
         const lampCount = sim.entities.filter(e => e.type === 'lamp').length;
-        const gives = lampCount + sim.entities.filter(e => e.type === 'brush').length + doorways.length + Math.max(0, sim.fighters.length - 1);
+        const gives = lampCount + sim.entities.filter(e => e.type === 'brush' || e.type === 'camp').length + doorways.length + Math.max(0, sim.fighters.length - 1);
         // (And no fewer lights in all than any world before had,
         // `tune.gives`: the shaders are written for so many lights, and
         // with as many in every region they are the same ones and made
@@ -439,6 +439,12 @@ const viewLight = (() => {
                 if (e.type !== 'brush' || e.burning < 0) continue;
                 const [x, , z] = space.toBlocks(e.x, e.y), life = Math.max(0, 1 - e.burning / C.props.burnSeconds);
                 glowing.push({ at: [x, FIRE.height, z], color: P.flame, intensity: FIRE.intensity * Math.sqrt(life) * flicker(e.col * 3 + e.row), reach: FIRE.reach, decay: FIRE.decay });
+                glows.push({ at: [x, FIRE.height, z], reach: GLOW.fire, rgb: rgbOf(P.flame, Math.sqrt(life)) });
+            }
+            for (const e of current.entities) {
+                if (e.type !== 'camp' || !(e.burn > 0)) continue;
+                const [x, , z] = space.toBlocks(e.x, e.y), life = Math.min(1, e.burn / 3);
+                glowing.push({ at: [x, FIRE.height, z], color: P.flame, intensity: FIRE.intensity * Math.sqrt(life) * flicker(x * 3 + z), reach: FIRE.reach, decay: FIRE.decay });
                 glows.push({ at: [x, FIRE.height, z], reach: GLOW.fire, rgb: rgbOf(P.flame, Math.sqrt(life)) });
             }
             for (const l of lamps) {

@@ -25,7 +25,14 @@
 //   lights the torch and sets the thicket alight; fire spreads to the
 //   thickets next to it, and each burns away to bare ground. The terrain
 //   change is an edit, so it stays burnt.
-// - node: a resource (`O` iron ore, `X` crystal, `h` herb; design.md 6.5).
+// - camp: a firepit (`F`; user, 2026-10-12) in the wild. Holding the interact
+//   key spends gameConfig.camp.wood firewood, heals a share of the max HP
+//   and lets the gear be changed (the page opens the menu on the `camp`
+//   event); it needs the fighter out of any fight and no monster within its
+//   own alert range of them. The fire burns for camp.burn seconds after
+//   (`burn`, drawn only).
+// - node: a resource (`O` iron ore, `X` crystal, `h` herb, `L` firewood;
+//   design.md 6.5).
 //   Holding the interact key gathers it: it throws out its loot and is gone
 //   -- rubble where a boulder stood, bare ground for a herb -- until it grows
 //   back: once gather.regrowSeconds of play (the progress `clock`) have
@@ -58,8 +65,8 @@ const propKit = (() => {
     // else the world's progress.
     const bagOf = (sim, f) => sim.bags?.[f?.id] || progressOf(sim);
     const nodeKey = (region, c, r) => `${region}/${c},${r}`;
-    // What a gathered resource leaves: rubble for a boulder, the map's floor for a plant.
-    const spentOf = (terrain, kind) => terrainKit.isSolid(kind) ? terrainKit.KIND.gravel : terrain.floor;
+    // What a gathered resource leaves: rubble for a boulder, the map's floor for a plant or a pile of firewood.
+    const spentOf = (terrain, kind) => terrainKit.isSolid(kind) && kind !== terrainKit.KIND.log ? terrainKit.KIND.gravel : terrain.floor;
     // Resources of `region` gathered too recently to be back: gone from the
     // terrain before anything is placed on it.
     function regrow(terrain, progress, region) {
@@ -132,6 +139,15 @@ const propKit = (() => {
             });
         }
         for (const { col, row } of terrain.chests) if (!chests.has(`${col},${row}`)) throw new Error(`${map.name}: C at ${col},${row} is in no chest list`);
+        const camps = new Set();
+        for (const k of map.camps || []) {
+            const [c, r] = k.at || [];
+            if (letter(map, c, r) !== 'F') throw new Error(`${map.name}: camp needs F at ${c},${r}`);
+            camps.add(`${c},${r}`);
+            const at = centre(c, r);
+            out.push({ id: `camp-${c}-${r}`, type: 'camp', x: at.x, y: at.y, h: 0, facing: 0, radius: gameConfig.camp.radius, solid: true, burn: 0 });
+        }
+        for (const { col, row } of terrain.camps) if (!camps.has(`${col},${row}`)) throw new Error(`${map.name}: F at ${col},${row} is in no camp list`);
         // A grave at each boss's home; already showing where the save has
         // the boss down and not called back.
         terrain.monsters.forEach(({ kind, col, row }, spawn) => {
@@ -191,10 +207,13 @@ const propKit = (() => {
             if (e.state !== 'ready') return null;
             const short = missing(sim, e.boss, p);
             out = { verb: '复活', name: `${bossName(e.boss)}之墓`, hold: gameConfig.interact.graveHold, ready: !short, why: short ? `要${short}` : '' };
+        } else if (e.type === 'camp') {
+            const why = campWhy(sim, p);
+            out = { verb: '扎营', name: '营地', hold: gameConfig.camp.hold, ready: !why, why };
         } else if (e.type === 'brush') {
             if (e.burning >= 0) return null;
-            // A torch carried does it: one press lights the torch and the thicket.
-            const torch = inventoryKit.offhandOf(p.loadout) === 'torch';
+            // A torch carried does it: one press lights the torch and the thicket (a lit one, or one in the bag to light).
+            const torch = inventoryKit.offhandOf(p.loadout) === 'torch' && (p.lit || inventoryKit.count(bagOf(sim, p), 'torch') > 0);
             out = { verb: '点燃', name: '枯木丛', hold: 0, ready: torch, why: torch ? '' : '要用火把点燃' };
         } else if (e.type === 'node') {
             const G = gameConfig.gather[e.kind];
@@ -217,8 +236,29 @@ const propKit = (() => {
             drop(sim, e.loot, e.x + Math.cos(e.facing) * ahead, e.y + Math.sin(e.facing) * ahead);
             emit(sim, 'chest_open', { side: p.id, target: e.id, at: space.toBlocks(e.x, e.y, 24) });
         } else if (e.type === 'grave') call(sim, e, p);
+        else if (e.type === 'camp') camp(sim, e, p);
         else if (e.type === 'brush') { fighterKit.light(sim, p, true); ignite(sim, e, p.id); }
         else if (e.type === 'node') gather(sim, e, p);
+    }
+    // ---- a camp ----
+    // Why `p` cannot make camp now ('' when it can): too little firewood,
+    // a monster in a fight anywhere in the region, or one near enough to
+    // notice (within its own alert range, a wall or not).
+    function campWhy(sim, p) {
+        const C = gameConfig.camp, have = inventoryKit.count(bagOf(sim, p), 'wood');
+        if (have < C.wood) return `要木材 ×${C.wood}（有 ${have}）`;
+        if (monsterKit.inFight(sim)) return '战斗中不能扎营';
+        if (sim.entities.some(m => m.type === 'monster' && monsterKit.living(m) && Math.hypot(m.x - p.x, m.y - p.y) <= gameConfig.monsters[m.kind].alertRange)) return '附近有怪物';
+        return '';
+    }
+    // The firewood is spent, a share of the HP comes back, the fire is lit.
+    function camp(sim, e, p) {
+        const C = gameConfig.camp;
+        inventoryKit.give(bagOf(sim, p), 'wood', -C.wood);
+        const before = p.hp;
+        p.hp = Math.min(p.maxHp, p.hp + Math.round(p.maxHp * C.heal));
+        e.burn = C.burn;
+        emit(sim, 'camp', { side: p.id, target: e.id, healed: p.hp - before, at: space.toBlocks(e.x, e.y, 20) });
     }
     // ---- a boss's grave ----
     // Is boss `kind` in the world: standing, or fallen and not yet sunk?
@@ -354,6 +394,7 @@ const propKit = (() => {
             if (e.type === 'drop') tickDrop(sim, e, dt);
             else if (e.type === 'brush') tickBrush(sim, e, dt);
             else if (e.type === 'chest' && e.open && e.t < 99) e.t = Math.min(99, e.t + dt);
+            else if (e.type === 'camp' && e.burn > 0) e.burn = Math.max(0, e.burn - dt);
             else if (e.type === 'grave') tickGrave(sim, e, dt);
         }
     }

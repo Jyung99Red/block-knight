@@ -25,7 +25,7 @@ const mapApp = (() => {
     const COLOURS = Object.freeze({
         grass: '#5f9b4c', path: '#b99c68', cobble: '#9ba1a8', gravel: '#8d8779', herb: '#eef08a',
         tree: '#1f5c2c', wood: '#8a5a30', portal: '#4c3a78', gate: '#b477ff', brush: '#9a6a22',
-        ore: '#c8763a', crystal: '#63d2e6', water: '#3f86d6', hedge: '#2f8a45', drop: '#d7e6f2', fence: '#a8743c'
+        ore: '#c8763a', crystal: '#63d2e6', water: '#3f86d6', hedge: '#2f8a45', drop: '#d7e6f2', fence: '#a8743c', log: '#6b4423'
     });
     const UNKNOWN = '#d24bc0', TREE_CROWN = '#3a8a48';
     // Stone by its height in blocks: a low stone light, a wall darker the higher.

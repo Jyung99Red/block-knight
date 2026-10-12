@@ -19,7 +19,7 @@ const mapPlan = (() => {
     // later) goes by its own name.
     const KIND_NAMES = Object.freeze({
         grass: '草地', path: '土路', cobble: '石板地', gravel: '碎石地', stone: '石墙', tree: '树', wood: '建筑墙',
-        portal: '传送门柱', gate: '传送门', brush: '枯木丛', ore: '铁矿', crystal: '晶石', herb: '草药', water: '水潭', hedge: '灌木', drop: '断崖外', fence: '木栅栏'
+        portal: '传送门柱', gate: '传送门', brush: '枯木丛', ore: '铁矿', crystal: '晶石', herb: '草药', water: '水潭', hedge: '灌木', drop: '断崖外', fence: '木栅栏', log: '柴堆'
     });
     const SIDE_NAMES = Object.freeze({ north: '北', south: '南', east: '东', west: '西' });
     const kindName = kind => gameConfig.gather[kind]?.name || KIND_NAMES[kind] || String(kind);

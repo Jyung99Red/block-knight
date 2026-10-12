@@ -56,22 +56,22 @@ test('gear goes on only if owned and in its own slot; the main hand is never emp
     assert.equal(K.equip(p, 'main', null), '主手不能空着');
     assert.equal(K.equip(p, 'offhand', null), '');
     assert.equal(p.loadout.offhand, null);
-    assert.equal(K.equip(p, 'offhand', 'torch'), '还没有');
+    assert.equal(K.equip(p, 'offhand', 'torch'), '', 'a torch slot may be empty too: the key greys out');
     assert.equal(K.equip(p, 'offhand', 'potion'), '', 'a potion slot may be empty: the key greys out');
     assert.equal(K.equip(p, 'ring', 'chief_charm'), '没有这个装备栏');
     assert.deepEqual(plain(K.gearFor('offhand')), Object.keys(I).filter(id => I[id].slot === 'offhand'));
 });
 
-test('the shop sells potions (a few at most), a torch and the ring of stealth, and buys materials, one or all', () => {
+test('the shop sells potions and torches (a few at most), and the ring of stealth, and buys materials, one or all', () => {
     const p = fresh();
     assert.equal(K.buy(p, 'potion'), '金币不够');
     p.inventory.gold = 1000;
     for (let i = 0; i < I.potion.max; i++) assert.equal(K.buy(p, 'potion'), '');
     assert.equal(K.buy(p, 'potion'), `最多带 ${I.potion.max} 个`);
-    assert.equal(K.buy(p, 'torch'), '');
-    assert.equal(K.buy(p, 'torch'), '已经有了');
+    for (let i = 0; i < I.torch.max; i++) assert.equal(K.buy(p, 'torch'), '');
+    assert.equal(K.buy(p, 'torch'), `最多带 ${I.torch.max} 个`);
     assert.equal(K.buy(p, 'iron_sword'), '不卖这个');
-    assert.equal(p.inventory.gold, 1000 - I.potion.max * I.potion.price - I.torch.price);
+    assert.equal(p.inventory.gold, 1000 - I.potion.max * I.potion.price - I.torch.max * I.torch.price);
     p.inventory.items.goblin_ear = 3; p.inventory.items.wolf_pelt = 2;
     assert.equal(K.sell(p, 'goblin_ear'), '');
     assert.equal(K.count(p, 'goblin_ear'), 2);
@@ -80,7 +80,7 @@ test('the shop sells potions (a few at most), a torch and the ring of stealth, a
     assert.equal('wolf_pelt' in p.inventory.items, false, 'none left: the entry goes');
     assert.equal(K.sell(p, 'wolf_pelt'), '没有可卖的');
     assert.equal(K.sell(p, 'wooden_sword'), '不收这个');
-    assert.equal(p.inventory.gold, 1000 - I.potion.max * I.potion.price - I.torch.price + I.goblin_ear.sell + 2 * I.wolf_pelt.sell);
+    assert.equal(p.inventory.gold, 1000 - I.potion.max * I.potion.price - I.torch.max * I.torch.price + I.goblin_ear.sell + 2 * I.wolf_pelt.sell);
     assert.deepEqual(plain(K.forSale()), ['potion', 'torch', 'stealth_ring']);
     // The ring (user, 2026-10-06): bought for gold, once, and worn as an accessory.
     p.inventory.gold = I.stealth_ring.price - 1;
@@ -268,6 +268,64 @@ test('pressed in the middle of a move, the drink waits for the move to end', () 
     tap(sim, 'offhand'); assert.equal(p.drink, null);
 });
 
+// ---- a camp in the wild ----
+test('a camp (user, 2026-10-12): held with the key it spends firewood and heals a third, but not in a fight or with a monster in range', () => {
+    const save = fresh();
+    save.inventory.items.wood = gameConfig.camp.wood + 1;
+    const sim = W.create({ region: 'field', progress: save }), p = sim.player, camp = sim.entities.find(e => e.type === 'camp');
+    assert.ok(camp, 'the field has a camp');
+    const monsters = sim.monsters;
+    sim.monsters = [];
+    put(p, camp.x, camp.y + 36, -Math.PI / 2); p.hp = 10;
+    step(sim, 0.02);
+    assert.equal(p.focus, camp.id);
+    assert.deepEqual(plain(interactKit.target(sim, p).offer), { verb: '扎营', name: '营地', hold: gameConfig.camp.hold, ready: true, why: '' });
+    // A monster whose alert range reaches them: not now.
+    const wolf = monsters.find(m => m.kind === 'wolf');
+    sim.monsters = [wolf];
+    // (Asked at once, before the wolf has time to notice them.)
+    put(wolf, p.x + gameConfig.monsters.wolf.alertRange - 1, p.y); wolf.phase = 'patrol';
+    assert.equal(interactKit.target(sim, p).offer.why, '附近有怪物');
+    put(wolf, p.x + gameConfig.monsters.wolf.alertRange + 20, p.y);
+    assert.equal(interactKit.target(sim, p).offer.ready, true);
+    // Fighting anywhere in the region.
+    wolf.phase = 'chase';
+    assert.equal(interactKit.target(sim, p).offer.why, '战斗中不能扎营');
+    sim.monsters = []; step(sim, 0.02);
+    // Held to the end: the wood is spent, a third of the top comes back, the fire burns.
+    W.drain(sim);
+    press(sim, 'interact'); step(sim, gameConfig.camp.hold / 2);
+    assert.equal(K.count(sim.progress, 'wood'), gameConfig.camp.wood + 1, 'nothing yet');
+    step(sim, gameConfig.camp.hold / 2 + 0.05); release(sim, 'interact');
+    const happened = events(sim, 'camp');
+    assert.equal(happened.length, 1);
+    assert.equal(K.count(sim.progress, 'wood'), 1);
+    assert.equal(p.hp, 10 + Math.round(p.maxHp * gameConfig.camp.heal));
+    assert.equal(happened[0].healed, p.hp - 10);
+    assert.ok(camp.burn > 0);
+    // Too little firewood: told how much.
+    step(sim, 0.02);
+    assert.match(interactKit.target(sim, p).offer.why, /木材/);
+    assert.equal(interactKit.target(sim, p).offer.ready, false);
+});
+
+test('firewood: a pile is gathered like ore, leaves bare ground, and grows back after a while of play', () => {
+    const sim = W.create({ region: 'field' }), p = sim.player, t = sim.terrain;
+    sim.monsters = [];
+    const pile = sim.entities.find(e => e.type === 'node' && e.kind === 'log');
+    assert.ok(pile, 'the field has firewood');
+    put(p, pile.x, pile.y + 36, -Math.PI / 2); step(sim, 0.02);
+    assert.equal(p.focus, pile.id);
+    press(sim, 'interact'); step(sim, gameConfig.gather.log.hold + 0.1); release(sim, 'interact');
+    assert.ok(K.count(sim.progress, 'wood') === 0, 'the wood lies on the ground first');
+    step(sim, 1);
+    assert.ok(K.count(sim.progress, 'wood') >= 1);
+    assert.equal(T.kindAt(t, pile.col, pile.row), t.floor);
+    sim.progress.clock += gameConfig.gather.regrowSeconds;
+    const again = W.create({ region: 'field', progress: saveKit.merge(fresh(), sim) });
+    assert.equal(again.entities.some(e => e.id === pile.id), true);
+});
+
 // ---- the torch, thickets and the dark ----
 function torchBearer(region = 'cave') {
     const save = fresh();
@@ -327,6 +385,36 @@ test('a torch carried sets a thicket alight with one press, lighting itself; the
     const bare = W.create({ region: 'cave' }), b = bare.entities.find(e => e.type === 'brush');
     put(bare.player, b.x, b.y + 36, -Math.PI / 2); bare.monsters = []; step(bare, 0.02);
     assert.equal(interactKit.target(bare, bare.player).offer.why, '要用火把点燃');
+});
+
+test('a torch burns only while lit, one after another from the bag, and goes out with none left (user, 2026-10-12)', () => {
+    const { sim, p, save } = torchBearer('field'), burn = I.torch.burn, bag = sim.progress;
+    bag.inventory.items.torch = 2;
+    step(sim, 30);
+    assert.equal(bag.inventory.torch, undefined, 'unlit, it does not burn');
+    tap(sim, 'offhand');
+    step(sim, 10);
+    assert.ok(Math.abs(bag.inventory.torch - (burn - 10)) < 0.05);
+    tap(sim, 'offhand'); step(sim, 10);
+    assert.ok(Math.abs(bag.inventory.torch - (burn - 10)) < 0.05, 'put out, it keeps what is left');
+    // The save keeps the seconds left of the one burning.
+    const kept = saveKit.merge(save, sim);
+    assert.ok(Math.abs(kept.inventory.torch - (burn - 10)) < 0.05);
+    assert.equal(W.create({ region: 'field', progress: kept }).progress.inventory.torch, kept.inventory.torch);
+    tap(sim, 'offhand');
+    bag.inventory.torch = 0.05; W.drain(sim);
+    step(sim, 0.1);
+    assert.equal(K.count(bag, 'torch'), 1);
+    assert.ok(burn - bag.inventory.torch < 0.1, 'the next one takes over');
+    assert.equal(p.lit, true);
+    assert.equal(events(sim, 'torch_spent')[0].left, 1);
+    bag.inventory.torch = 0.05;
+    step(sim, 0.1);
+    assert.equal(K.count(bag, 'torch'), 0);
+    assert.equal(p.lit, false, 'the last one is spent');
+    assert.equal(bag.inventory.torch, undefined);
+    tap(sim, 'offhand');
+    assert.equal(p.lit, false, 'none left: the key does nothing');
 });
 
 test('the dark cave hangs off the valley, and the valley is reached only past the goblin chief', () => {

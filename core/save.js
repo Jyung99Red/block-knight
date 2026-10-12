@@ -1,6 +1,7 @@
 // The save (design.md 6.6; the 2D version's saves are not read):
 // { v, bosses: { kind: true }, revived: { kind: true }, chests: { 'region/chest id': true },
-//   inventory: { gold, items: { id: count } }, loadout: { main, offhand,
+//   inventory: { gold, items: { id: count }, torch? (seconds left of the
+//   torch burning) }, loadout: { main, offhand,
 //   armor, accessory }, edits: { region: [[col, row, kind, level]] },
 //   clock, gathered: { 'region/col,row': clock when gathered } }.
 // `edits` are the terrain's changes against the map it was generated from
@@ -46,6 +47,7 @@ const saveKit = (() => {
                     if (item && item.kind !== 'gold' && whole(n) && n > 0) out.inventory.items[id] = Math.min(n, item.max || n);
                 }
             }
+            if (Number.isFinite(bag.torch) && bag.torch > 0 && out.inventory.items.torch) out.inventory.torch = Math.min(bag.torch, gameConfig.items.torch.burn);
         }
         // The starter gear is always owned (version 1 saves had none).
         for (const id of Object.values(inventoryKit.starter())) if (id) out.inventory.items[id] = 1;
@@ -81,7 +83,7 @@ const saveKit = (() => {
             // A boss called back is down again once beaten: the world's own word.
             if (p.revived) out.revived = { ...p.revived };
             out.chests = { ...out.chests, ...p.chests };
-            out.inventory = { gold: p.inventory.gold, items: { ...p.inventory.items } };
+            out.inventory = { gold: p.inventory.gold, items: { ...p.inventory.items }, ...(p.inventory.torch > 0 ? { torch: p.inventory.torch } : {}) };
             if (p.loadout) out.loadout = { ...p.loadout };
             if (Number.isFinite(p.clock)) out.clock = Math.max(out.clock, p.clock);
             if (p.gathered) out.gathered = { ...out.gathered, ...p.gathered };

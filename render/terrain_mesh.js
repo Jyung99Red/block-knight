@@ -159,7 +159,7 @@ ${glows ? 'irradiance += texture2D(glowMap, (vCutPos.xz + vSide.xz * 0.5) / glow
         return `vec3 waterFire = vec3(0.0);\n${from < 0 || at < 0 ? chunk : chunk.slice(0, at) + sheen + chunk.slice(at)}`;
     }
     // Tile and shade spread per solid kind (by name).
-    const BLOCK = { stone: ['stone', 0.07], tree: ['bark', 0.05], wood: ['plank', 0.04], portal: ['portalStone', 0.06], brush: ['brush', 0.1], ore: ['ore', 0.06], crystal: ['crystalRock', 0.05], hedge: ['leaves', 0.12] };
+    const BLOCK = { stone: ['stone', 0.07], tree: ['bark', 0.05], wood: ['plank', 0.04], portal: ['portalStone', 0.06], brush: ['brush', 0.1], ore: ['ore', 0.06], crystal: ['crystalRock', 0.05], hedge: ['leaves', 0.12], log: ['bark', 0.05] };
 
     // Drawn-only blocks: { 'x,y,z': { tile, tint } } for the whole map.
     function decor(sim) {

@@ -24,6 +24,9 @@ const viewProps = (() => {
         // ground when they first do; called, the stone trembles as it glows.
         const graveRig = rigKit.build(propModels.grave), graves = new Map();
         for (const e of sim.entities) if (e.type === 'grave') graves.set(e.id, character(graveRig));
+        // Camps: the firepit (static) and, while it burns, its flames.
+        const campRig = rigKit.build(propModels.camp), camps = new Map();
+        for (const e of sim.entities) if (e.type === 'camp') camps.set(e.id, character(campRig));
         const unitBox = new T.BoxGeometry(1, 1, 1), DROPS = 64, drops = new T.InstancedMesh(unitBox, new T.MeshLambertMaterial({ map: tx.grain }), DROPS);
         drops.castShadow = true; drops.frustumCulled = false; drops.count = 0;
         // (Its colours are there from the start, and the flames' below: a
@@ -32,7 +35,7 @@ const viewProps = (() => {
         drops.setColorAt(0, new T.Color('#ffffff'));
         scene.add(drops);
         // Flames on burning thickets: a few bright cubes per block, licking.
-        const FIRES = 48, fires = new T.InstancedMesh(unitBox, new T.MeshBasicMaterial(), FIRES);
+        const FIRES = 64, fires = new T.InstancedMesh(unitBox, new T.MeshBasicMaterial(), FIRES);
         fires.frustumCulled = false; fires.count = 0;
         fires.setColorAt(0, new T.Color('#ffffff'));
         scene.add(fires);
@@ -102,7 +105,22 @@ const viewProps = (() => {
             drops.count = n;
             drops.instanceMatrix.needsUpdate = true;
             if (drops.instanceColor) drops.instanceColor.needsUpdate = true;
+            for (const e of current.entities) {
+                if (e.type !== 'camp') continue;
+                camps.get(e.id)?.place(rigKit.solve(campRig, {}, space.toBlocks(e.x, e.y, e.h), 0));
+            }
             let f = 0;
+            // A camp's fire dies down over the last seconds of its burning.
+            for (const e of current.entities) {
+                if (e.type !== 'camp' || !(e.burn > 0)) continue;
+                const [x, , z] = space.toBlocks(e.x, e.y), life = Math.min(1, e.burn / 3);
+                for (let k = 0; k < 5 && f < FIRES; k++, f++) {
+                    const a = k * 1.3 + e.x * 0.37, lick = 0.5 + 0.5 * Math.sin(clock * (8 + k) + a), size = (0.2 + 0.2 * lick) * Math.max(0.25, life);
+                    place.position.set(x + Math.cos(a) * 0.12 * (k > 0), 0.4 + size / 2 + lick * 0.18 * life, z + Math.sin(a) * 0.12 * (k > 0));
+                    place.rotation.set(0, a + clock, 0); place.scale.setScalar(size); place.updateMatrix();
+                    fires.setMatrixAt(f, place.matrix); fires.setColorAt(f, tint.set(k % 2 ? P.flame : P.flameTip));
+                }
+            }
             for (const e of current.entities) {
                 if (e.type !== 'brush' || e.burning < 0) continue;
                 const [x, , z] = space.toBlocks(e.x, e.y), life = 1 - e.burning / C.props.burnSeconds;

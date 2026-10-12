@@ -83,7 +83,7 @@ const worldSim = (() => {
         // clock: seconds played (outside duels), which grows resources back.
         const world = {
             bosses: { ...saved.bosses }, revived: { ...saved.revived }, chests: { ...saved.chests },
-            inventory: { gold: saved.inventory?.gold || 0, items: { ...saved.inventory?.items } }, loadout: { ...loadout },
+            inventory: { gold: saved.inventory?.gold || 0, items: { ...saved.inventory?.items }, ...(saved.inventory?.torch > 0 ? { torch: saved.inventory.torch } : {}) }, loadout: { ...loadout },
             clock: saved.clock || 0, gathered: { ...saved.gathered }
         };
         const dummy = dummyKit.create(terrain, map.dummyFacing ?? Math.PI);
@@ -109,6 +109,20 @@ const worldSim = (() => {
             speed: 0, pace: 0, gait: 0, moveBlend: 0, runBlend: 0, moveTime: 0,
             loadout: { ...gear }
         }, { id, endless, stats: inventoryKit.statsOf(gear) });
+    }
+
+    // Fighter `f` puts on `loadout` where it stands (a camp, design.md 7.2):
+    // the stats follow the gear (HP kept as it is, up to the new top), the
+    // guard bar is whole, a torch no longer in the offhand goes out, and the
+    // skeleton is built anew (the page draws the world again).
+    function regear(sim, f, loadout) {
+        f.loadout = { ...loadout };
+        const stats = inventoryKit.statsOf(f.loadout);
+        Object.assign(f, { maxHp: stats.maxHp, atk: stats.atk, def: stats.def, guardMax: stats.guard });
+        f.hp = Math.min(f.hp, f.maxHp);
+        f.guard.bar = f.guardMax;
+        if (inventoryKit.offhandOf(f.loadout) !== 'torch') f.lit = false;
+        sim.rigs.fighters[f.id] = rigOf(f.loadout);
     }
 
     // ---- a shared adventure (design.md 10): a second player comes and goes ----
@@ -248,5 +262,5 @@ const worldSim = (() => {
     }
     // Take the events since the last call.
     function drain(sim) { return sim.events.splice(0); }
-    return { BUTTONS, DUEL_IDS, create, join, part, beside, command, nearestFighter, step, concede, outcome, snapshot, restore, drain };
+    return { BUTTONS, DUEL_IDS, create, regear, join, part, beside, command, nearestFighter, step, concede, outcome, snapshot, restore, drain };
 })();

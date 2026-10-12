@@ -1,5 +1,5 @@
 // Models of the world's props (design.md 6): the chest (a rig with a
-// hinged lid), a boss's grave, the shapes of things lying on the ground, the roof colour of
+// hinged lid), a boss's grave, a camp's firepit, the shapes of things lying on the ground, the roof colour of
 // each building, and the colours of a portal's opening. Data only; the
 // renderer builds them.
 const propModels = Object.freeze({
@@ -38,6 +38,21 @@ const propModels = Object.freeze({
         ],
         mounts: {}
     },
+    // A camp's firepit (user, 2026-10-12): a ring of stones round a stack of
+    // logs on a bed of ash, about 1 block across. The fire is drawn apart
+    // (render/view_props.js) while it burns.
+    camp: {
+        bones: [{ name: 'base', parent: null, at: [0, 0, 0] }],
+        parts: [
+            { bone: 'base', size: [0.56, 0.04, 0.56], at: [0, 0.02, 0], color: 'woodDark' },
+            ...[[-0.36, 0], [0.36, 0], [0, -0.36], [0, 0.36], [-0.26, -0.26], [0.26, -0.26], [-0.26, 0.26], [0.26, 0.26]]
+                .map(([x, z], i) => ({ bone: 'base', size: [0.22, 0.2 + (i % 3) * 0.03, 0.22], at: [x, 0.1 + (i % 3) * 0.015, z], color: i % 2 ? 'stone' : 'stoneDark' })),
+            { bone: 'base', size: [0.62, 0.12, 0.13], at: [0, 0.1, 0.07], color: 'wood' },
+            { bone: 'base', size: [0.13, 0.12, 0.62], at: [0.07, 0.22, 0], color: 'woodDark' },
+            { bone: 'base', size: [0.5, 0.12, 0.13], at: [0, 0.34, -0.06], color: 'wood' }
+        ],
+        mounts: {}
+    },
     // Loot on the ground: a small box per item, in blocks.
     drops: {
         gold: { size: [0.2, 0.14, 0.2], color: 'gold' },
@@ -46,6 +61,7 @@ const propModels = Object.freeze({
         chief_tusk: { size: [0.1, 0.1, 0.3], color: 'tuskItem' },
         king_fang: { size: [0.08, 0.08, 0.26], color: 'fangItem' },
         iron_ore: { size: [0.2, 0.16, 0.18], color: 'ore' },
+        wood: { size: [0.3, 0.1, 0.12], color: 'woodDark' },
         crystal: { size: [0.1, 0.24, 0.1], color: 'crystal' },
         herb: { size: [0.22, 0.08, 0.16], color: 'herbLight' },
         spider_silk: { size: [0.2, 0.12, 0.2], color: 'silkItem' },

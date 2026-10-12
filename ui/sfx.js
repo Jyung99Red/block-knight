@@ -76,8 +76,8 @@ const sfx = (() => {
         empty: () => tone('square', 180, 160, 0.05, 0.025),
         torch: lit => lit ? hiss(400, 1400, 0.25, 0.05, 0.6) : hiss(900, 300, 0.15, 0.03, 0.8),
         burn: () => { hiss(1500, 600, 0.5, 0.05, 0.5); hiss(300, 200, 0.6, 0.04, 1.2); },
-        // Stone cracking (ore, crystal) or leaves rustling (a herb).
-        gather: kind => kind === 'herb' ? hiss(2400, 1400, 0.16, 0.04, 0.5) : (tone('square', 220, 140, 0.08, 0.05), hiss(900, 400, 0.18, 0.05, 0.9), kind === 'crystal' && tone('sine', 1760, 1980, 0.18, 0.03, 0.05)),
+        // Stone cracking (ore, crystal), leaves rustling (a herb) or wood knocking (firewood).
+        gather: kind => kind === 'herb' ? hiss(2400, 1400, 0.16, 0.04, 0.5) : kind === 'log' ? (tone('square', 150, 100, 0.07, 0.05), hiss(500, 250, 0.15, 0.04, 0.9)) : (tone('square', 220, 140, 0.08, 0.05), hiss(900, 400, 0.18, 0.05, 0.9), kind === 'crystal' && tone('sine', 1760, 1980, 0.18, 0.03, 0.05)),
         // A boss's grave called: a low swell and a falling call.
         call: () => { hiss(200, 900, 0.6, 0.05, 0.7); tone('sawtooth', 70, 110, 0.7, 0.05); tone('sine', 392, 262, 0.5, 0.05, 0.45); },
         boss: () => { tone('sine', 523, 523, 0.18, 0.06); tone('sine', 659, 659, 0.18, 0.06, 0.16); tone('sine', 784, 784, 0.18, 0.06, 0.32); tone('sine', 1047, 1047, 0.5, 0.06, 0.48); }
@@ -100,14 +100,15 @@ const sfx = (() => {
         else if (e.type === 'result') sounds[e.outcome || outcome]?.();
         else if (e.type === 'pickup' && own) sounds.pickup(e.item === 'gold');
         else if (e.type === 'chest_open') sounds.chest();
-        else if (e.type === 'rest' && own) sounds.rest();
+        else if ((e.type === 'rest' || e.type === 'camp') && own) sounds.rest();
         else if (e.type === 'open' && own) sounds.door();
         else if (e.type === 'boss_defeated') sounds.boss();
         else if (e.type === 'grave_call') sounds.call();
         else if (e.type === 'revive') sounds.fallen();
         else if (e.type === 'drink' && own) sounds.drink();
         else if (e.type === 'drink_spilled' && own) sounds.spill();
-        else if (e.type === 'potion_empty' && own) sounds.empty();
+        else if ((e.type === 'potion_empty' || e.type === 'torch_empty') && own) sounds.empty();
+        else if (e.type === 'torch_spent' && own) sounds.torch(false);
         else if ((e.type === 'torch_lit' || e.type === 'torch_out') && own) sounds.torch(e.type === 'torch_lit');
         else if (e.type === 'burn' && e.side) sounds.burn();
         else if (e.type === 'gather' && own) sounds.gather(e.kind);

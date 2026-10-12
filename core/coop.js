@@ -41,7 +41,7 @@ const coopKit = (() => {
     const P = () => gameConfig.pvp, C = () => gameConfig.coop;
     const STEP = simLoop.STEP;
     const FIXED = new Set(['building', 'portal', 'lamp']);
-    const LIVE = new Set(['dummy', 'monster', 'chest', 'grave', 'drop', 'brush', 'node']);
+    const LIVE = new Set(['dummy', 'monster', 'chest', 'grave', 'drop', 'brush', 'node', 'camp']);
     const TRADES = { buy: (bag, id) => inventoryKit.buy(bag, id), sell: (bag, id, n) => inventoryKit.sell(bag, id, n), craft: (bag, id) => inventoryKit.craft(bag, id) };
     const PREDICTED = duelKit.PREDICTED;
     // A frame this long after the last one: this phone itself stood still

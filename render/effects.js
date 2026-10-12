@@ -132,7 +132,8 @@ const renderEffects = (() => {
                 else if (e.type === 'revive') { burst(e.at, 30, ['#a183ff', '#ecd9ff', '#6b4a2a', ...(FALLEN[e.kind] || [])], 1.4, 3.4, 0.1); shake = Math.max(shake, 0.12); }
                 else if (e.type === 'chest_open') burst(e.at, 16, ['#ffe066', '#d8b04a', '#ffffff'], 1.2, 3, 0.06);
                 else if (e.type === 'pickup' && e.side === selfId) burst(e.at, 3, ['#fff3b0', '#ffffff'], 0.6, 1.2, 0.04);
-                else if (e.type === 'rest' && e.side === selfId) rested = 0.9;
+                else if ((e.type === 'rest' || e.type === 'camp') && e.side === selfId) rested = 0.9;
+                else if (e.type === 'camp') burst(e.at, 10, ['#ffb13b', '#ff6a2a', '#fff1a8'], 0.5, 1.6, 0.06);
                 else if (e.type === 'drink' && e.side === selfId) rested = 0.5;
                 else if (e.type === 'burn') burst(e.at, 6, ['#ffb13b', '#ff6a2a', '#fff1a8'], 0.6, 1.4, 0.06);
                 else if (e.type === 'burned') burst(e.at, 8, ['#3a3430', '#5a5048', '#ff8a3a'], 0.4, 1.2, 0.07);
@@ -143,7 +144,7 @@ const renderEffects = (() => {
         }
         const white = new T.Color('#ffffff'), red = new T.Color('#ff8a7a'), gold = new T.Color('#f2b544'), rage = new T.Color('#ff3a24');
         // Chips thrown up by gathering, by resource.
-        const GATHERED = { ore: [palette.stone, palette.ore, palette.stoneDark], crystal: [palette.crystal, palette.crystalDeep, '#ffffff'], herb: [palette.herb, palette.herbLight, palette.berry] };
+        const GATHERED = { ore: [palette.stone, palette.ore, palette.stoneDark], crystal: [palette.crystal, palette.crystalDeep, '#ffffff'], herb: [palette.herb, palette.herbLight, palette.berry], log: [palette.wood, palette.woodDark, palette.bark] };
         // Per frame. `view`: { selfId, fighters: [{ id, body, rig,
         // solved, blade, materials }] (those drawn), foes: [{ body, view:
         // { materials }, top, shown }] }.
@@ -161,6 +162,12 @@ const renderEffects = (() => {
                 if (e.type !== 'brush' || e.burning < 0 || rnd() > 0.7) continue;
                 const [x, , z] = space.toBlocks(e.x, e.y);
                 burst([x + (rnd() - 0.5) * 0.9, 0.3 + rnd() * 1.6, z + (rnd() - 0.5) * 0.9], 2, ['#ffb13b', '#ff6a2a', '#fff1a8'], 0.2, 0.6, 0.08 + rnd() * 0.06, true);
+            }
+            // A camp's fire burning: sparks rise from it.
+            for (const e of sim.entities) {
+                if (e.type !== 'camp' || !(e.burn > 0) || rnd() > 0.5) continue;
+                const [x, , z] = space.toBlocks(e.x, e.y);
+                burst([x + (rnd() - 0.5) * 0.5, 0.3 + rnd() * 0.6, z + (rnd() - 0.5) * 0.5], 1, ['#ffb13b', '#ff6a2a', '#fff1a8'], 0.2, 0.7, 0.07 + rnd() * 0.05, true);
             }
             // A boss's grave called: violet motes rise round it, more as it goes on.
             for (const e of sim.entities) {

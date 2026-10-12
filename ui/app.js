@@ -198,13 +198,15 @@ const app = (() => {
             changed: (kind, deal) => { if (!visiting()) persist(); else if (deal) coop.session.trade(deal.op, deal.id, deal.n); },
             closed: () => loop.reset()
         });
-        // Gear changes (in the base) take effect when the menu closes: the
-        // base is rebuilt round the player, where they stood, as hurt as
-        // they were.
+        // Gear changes (in the base, or at a camp just made, user,
+        // 2026-10-12) take effect when the menu closes: the base is rebuilt
+        // round the player, where they stood, as hurt as they were; at a
+        // camp the same world goes on, the player in the new gear.
+        let atCamp = false;
         const menu = menuScreen.attach(root, {
             progress: carried,
             player: me,
-            gearLock: () => visiting() ? '联机时不能换装备' : !duel && mapId === 'base' ? '' : '只能在曙光村里换装备',
+            gearLock: () => visiting() ? '联机时不能换装备' : !duel && (mapId === 'base' || atCamp) ? '' : '只能在曙光村或营地里换装备',
             canPause: () => !visiting() && !shared(),
             room: roomShown,
             changed: () => persist(),
@@ -214,8 +216,16 @@ const app = (() => {
                 else if (name === 'title') toTitle();
             },
             closed: ({ gearChanged }) => {
+                atCamp = false;
                 if (!gearChanged || duel || visiting()) return;
                 const p = sim.player;
+                if (mapId !== 'base') {
+                    worldSim.regear(sim, p, sim.progress.loadout);
+                    before = snapshot();
+                    view?.load(sim);
+                    display.reset(sim, clock, { announce: false });
+                    return;
+                }
                 load('base', { spot: { x: p.x, y: p.y, facing: p.facing }, carry: { hp: p.hp }, quiet: true });
             }
         });
@@ -370,8 +380,13 @@ const app = (() => {
                     else load(e.to, { arrival: e.from, carry: { hp: sim.player.hp }, party: 'alone' });
                     return;
                 }
-                if (mate || from !== sim) { if (e.type === 'chest_open' || e.type === 'grave_call' || e.type === 'boss_defeated') persist(); continue; }
+                if (mate || from !== sim) { if (e.type === 'chest_open' || e.type === 'grave_call' || e.type === 'boss_defeated' || e.type === 'camp') persist(); continue; }
                 if (e.type === 'open') { input.releaseAll(); if (BUILDING_SCREENS[e.what]) screens.open(BUILDING_SCREENS[e.what]); else menu.open(); }
+                else if (e.type === 'camp') {
+                    persist();
+                    // Gear is changed at a camp alone, not in a shared adventure.
+                    if (!shared()) { input.releaseAll(); atCamp = true; menu.open(); }
+                }
                 else if (e.type === 'boss_defeated' || e.type === 'chest_open' || e.type === 'grave_call') persist();
                 else if (e.type === 'pickup' && saveAt === null) saveAt = clock + SAVE_DELAY;
             }

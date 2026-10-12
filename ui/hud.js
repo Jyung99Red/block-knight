@@ -54,7 +54,7 @@ const hud = (() => {
             clock: $('[data-hud="clock"]'), clockRing: $('[data-hud="clock-ring"]'), clockHand: $('[data-hud="clock-hand"]')
         };
         els.clockRing.innerHTML = clockRing();
-        let shownTurn = NaN, shownTime = '';
+        let shownTurn = NaN, shownTime = '', shownBurn = '';
         let toasts = [], notice = null;
         let comboKey = '', comboShownAt = -1, floats = [], focus = null, mobs = new Map(), fightAt = null, selfId = 'player';
         const width = (el, share) => { el.style.width = `${(Math.max(0, Math.min(1, share)) * 100).toFixed(1)}%`; };
@@ -62,10 +62,10 @@ const hud = (() => {
         const nameOf = body => body.kind === 'fighter' ? '对手' : body.kind === 'dummy' ? gameConfig.dummy.name : gameConfig.monsters[body.kind].name;
         const topOf = body => body.kind === 'fighter' ? 2.15 : body.kind === 'dummy' ? 1.95 : monsterKit.height(body.kind) + 0.25;
         // Where a target's tag floats, in blocks above its spot.
-        const TAG = { building: 2.7, portal: 3.6, chest: 1.2, grave: 1.6, fighter: 1.2 };
+        const TAG = { building: 2.7, portal: 3.6, chest: 1.2, grave: 1.6, camp: 1.3, fighter: 1.2 };
         // Where the ring of a hold under way sits, in blocks above the
         // target's spot: about the top of it.
-        const HOLD = { chest: 0.75, grave: 1.1, ore: 1.05, crystal: 1.1, herb: 0.45, fighter: 0.6 };
+        const HOLD = { chest: 0.75, grave: 1.1, camp: 0.6, ore: 1.05, crystal: 1.1, herb: 0.45, log: 1.05, fighter: 0.6 };
         // A line in the middle of the screen for `seconds`: the region
         // entered, a boss down.
         function announce(title, note, seconds, now) {
@@ -186,14 +186,19 @@ const hud = (() => {
             // The guard key shows what it guards with: the shield, or the blade.
             els.guardKey.dataset.kind = combatKit.guardOf(p);
             // The offhand key shows the torch or the potion (and how many are
-            // left, greyed with none); with a shield or nothing it is grey.
+            // left, greyed with none; a torch also how much of the one
+            // burning is left); with a shield or nothing it is grey.
             const kind = inventoryKit.offhandOf(p.loadout), item = kind === 'torch' || kind === 'potion' ? kind : 'none';
-            const bag = sim.bags?.[p.id] || sim.progress || EMPTY, potions = item === 'potion' ? inventoryKit.count(bag, 'potion') : 0;
+            const bag = sim.bags?.[p.id] || sim.progress || EMPTY, left = item === 'none' ? 0 : inventoryKit.count(bag, item);
             els.offhand.dataset.kind = item;
             els.offhand.classList.toggle('lit', !!p.lit);
-            els.offhand.classList.toggle('disabled', item === 'none' || (item === 'potion' && potions < 1));
-            els.offhandCount.hidden = item !== 'potion';
-            els.offhandCount.textContent = String(potions);
+            els.offhand.classList.toggle('disabled', item === 'none' || left < 1);
+            els.offhandCount.hidden = item === 'none';
+            els.offhandCount.textContent = String(left);
+            if (item === 'torch') {
+                const burn = gameConfig.items.torch.burn, share = Math.max(0, Math.min(1, (bag.inventory?.torch ?? burn) / burn)).toFixed(3);
+                if (share !== shownBurn) { shownBurn = share; els.offhand.style.setProperty('--burn', share); }
+            }
             // The region and what is carried.
             const map = gameConfig.maps[sim.region];
             els.goal.hidden = !!sim.duel || !map;
@@ -328,6 +333,8 @@ const hud = (() => {
                 }
                 if (e.type === 'revive') announce(`${e.name}复活了`, '再打倒它，还会掉它的素材', 2.5, now);
                 if (e.type === 'rest' && e.side === selfId) announce('生命回满了', '', 1.6, now);
+                if (e.type === 'camp' && e.side === selfId) announce('在营地休息', e.healed ? `生命 +${e.healed}` : '', 1.8, now);
+                if (e.type === 'torch_spent' && e.side === selfId) announce('火把烧完了', e.left ? `还剩 ${e.left} 支` : '没有火把了', 1.8, now);
                 if (e.type === 'rescued' && (e.side === selfId || e.by === selfId)) announce(e.side === selfId ? '同伴把你救起来了' : '救起了同伴', '', 1.6, now);
                 // Whoever this fighter last traded blows with stays in the panel.
                 if (e.type === 'hit' || e.type === 'parry' || e.type === 'block') {

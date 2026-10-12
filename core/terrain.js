@@ -14,9 +14,9 @@ const terrainKit = (() => {
     // `portal` is a portal's pillar; `gate` the glowing opening between two
     // pillars, which nobody walks through (the interact key travels).
     // `brush` is a dry thicket a lit torch burns away (core/props.js).
-    // `ore`, `crystal` and `herb` are resources gathered with the interact
+    // `ore`, `crystal`, `herb` and `log` are resources gathered with the interact
     // key (gameConfig.gather): the first two a boulder, the herb a plant
-    // walked through. `water` is a pond: nothing stands in it, so it hides
+    // walked through, `log` a pile of firewood a block high. `water` is a pond: nothing stands in it, so it hides
     // nobody and a blow lands across it, but no body walks into it
     // (`closedAt`; user, 2026-10-04). `hedge` is a thick bush one block
     // high: it stops bodies and blows as a low stone does and is seen over,
@@ -25,20 +25,20 @@ const terrainKit = (() => {
     // the ground simply ends (the east edge of the field). `fence` is a
     // wooden fence one block high: it stops bodies and blows and is seen
     // over (user, 2026-10-04: the edges of a map are not all walls).
-    const KIND = Object.freeze({ grass: 0, path: 1, stone: 2, tree: 3, wood: 4, cobble: 5, gravel: 6, portal: 7, gate: 8, brush: 9, ore: 10, crystal: 11, herb: 12, water: 13, hedge: 14, drop: 15, fence: 16 });
+    const KIND = Object.freeze({ grass: 0, path: 1, stone: 2, tree: 3, wood: 4, cobble: 5, gravel: 6, portal: 7, gate: 8, brush: 9, ore: 10, crystal: 11, herb: 12, water: 13, hedge: 14, drop: 15, fence: 16, log: 17 });
     const NAMES = Object.freeze(Object.fromEntries(Object.entries(KIND).map(([name, k]) => [k, name])));
-    const SOLID = new Set([KIND.stone, KIND.tree, KIND.wood, KIND.portal, KIND.gate, KIND.brush, KIND.ore, KIND.crystal, KIND.hedge, KIND.fence]);
+    const SOLID = new Set([KIND.stone, KIND.tree, KIND.wood, KIND.portal, KIND.gate, KIND.brush, KIND.ore, KIND.crystal, KIND.hedge, KIND.fence, KIND.log]);
     // Ground no body stands on, though nothing stands there.
     const BARRED = new Set([KIND.water, KIND.drop]);
-    const RESOURCE = new Set([KIND.ore, KIND.crystal, KIND.herb]);
+    const RESOURCE = new Set([KIND.ore, KIND.crystal, KIND.herb, KIND.log]);
     const TREE_HEIGHT = 4, HOUSE_HEIGHT = 3, PORTAL_HEIGHT = 3, BRUSH_HEIGHT = 2;
     // Map letters that put a monster's home on a grass block.
     const MONSTERS = Object.freeze({ g: 'goblin', w: 'wolf', s: 'spider', G: 'goblinChief', K: 'wolfKing', M: 'minotaur' });
     // Map letters that put a lamp on a ground block (core/props.js): a
     // torch on a stand, and one on the wall beside the block.
     const LAMPS = Object.freeze({ i: 'stand', '!': 'wall' });
-    // Letters that mark a spot on grass: the spawn, the training dummy, a chest, a lamp.
-    const MARKS = new Set(['.', '@', 'D', 'C', ...Object.keys(MONSTERS), ...Object.keys(LAMPS)]);
+    // Letters that mark a spot on grass: the spawn, the training dummy, a chest, a camp, a lamp.
+    const MARKS = new Set(['.', '@', 'D', 'C', 'F', ...Object.keys(MONSTERS), ...Object.keys(LAMPS)]);
     // How far, in cells, a change shows beyond its own cell when drawn (a
     // tree's crown, a neighbour's hidden face): chunks that near are redrawn.
     const REACH = 3;
@@ -62,6 +62,7 @@ const terrainKit = (() => {
         if (ch === 'O') return [KIND.ore, 1];
         if (ch === 'X') return [KIND.crystal, 1];
         if (ch === 'h') return [KIND.herb, 0];
+        if (ch === 'L') return [KIND.log, 1];
         if (ch >= '1' && ch <= '9') return [KIND.stone, Number(ch)];
         return null;
     }
@@ -71,7 +72,7 @@ const terrainKit = (() => {
     // beyond a cliff, `+` a fence, `1`-`9` stone wall of
     // that many blocks, `T` tree, `H` a building's wall, `#` a portal's
     // pillar, `P` a portal's opening, `B` a dry thicket, `*` a hedge, `O` iron ore, `X`
-    // crystal, `h` a herb, `C` a chest, `@` a
+    // crystal, `h` a herb, `L` a pile of firewood, `C` a chest, `F` a camp, `@` a
     // spawn, `D` the training dummy, `i` a standing torch, `!` a torch on
     // the wall beside the cell, and the monster letters (MONSTERS).
     // A portal's opening is solid: it is used from in front, not walked into.
@@ -86,7 +87,7 @@ const terrainKit = (() => {
         const t = {
             width, height, unit, cw, ch, rows: [...rows], floor: ground[0], rev: 0, edits: {},
             chunks: Array.from({ length: cw * ch }, () => ({ kind: new Uint8Array(CHUNK * CHUNK), level: new Uint8Array(CHUNK * CHUNK), rev: 0 })),
-            spawn: null, spawns: [], dummy: null, monsters: [], portals: [], chests: [], lamps: []
+            spawn: null, spawns: [], dummy: null, monsters: [], portals: [], chests: [], camps: [], lamps: []
         };
         rows.forEach((row, r) => [...row].forEach((letter, c) => {
             const cell = cellOf(letter, t.floor);
@@ -98,6 +99,7 @@ const terrainKit = (() => {
                 t.dummy = { col: c, row: r };
             } else if (letter === 'P') t.portals.push({ col: c, row: r });
             else if (letter === 'C') t.chests.push({ col: c, row: r });
+            else if (letter === 'F') t.camps.push({ col: c, row: r });
             else if (LAMPS[letter]) t.lamps.push({ kind: LAMPS[letter], col: c, row: r });
             else if (MONSTERS[letter]) t.monsters.push({ kind: MONSTERS[letter], col: c, row: r });
         }));

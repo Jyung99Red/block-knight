@@ -329,11 +329,31 @@ const fighterKit = (() => {
                 emit(sim, p, 'drink', { healed: p.hp - before, left: inventoryKit.count(bag, 'potion') });
             }
         },
-        // A torch: each press lights it or puts it out. It lights the dark
-        // (drawn) and sets thickets alight (core/props.js).
+        // A torch (a supply, as a potion is; user, 2026-10-12): each press
+        // lights it or puts it out. It lights the dark (drawn) and sets
+        // thickets alight (core/props.js). One burns items.torch.burn
+        // seconds, counted only while lit; spent, the next one in the bag
+        // takes over, lit, and with none left it goes out. The seconds left
+        // of the one burning are kept with the bag (`inventory.torch`).
         torch: {
-            press(sim, p) { light(sim, p, !p.lit); return true; },
-            tick() {}
+            press(sim, p) {
+                if (!p.lit && inventoryKit.count(propKit.bagOf(sim, p), 'torch') < 1) { emit(sim, p, 'torch_empty'); return false; }
+                light(sim, p, !p.lit);
+                return true;
+            },
+            tick(sim, p, dt) {
+                // (A mirror leaves the burning to the host.)
+                if (!p.lit || sim.mirror) return;
+                const bag = propKit.bagOf(sim, p), burn = gameConfig.items.torch.burn;
+                if (inventoryKit.count(bag, 'torch') < 1) { light(sim, p, false); return; }
+                bag.inventory.torch = (bag.inventory.torch ?? burn) - dt;
+                if (bag.inventory.torch > 1e-9) return;
+                inventoryKit.give(bag, 'torch', -1);
+                const left = inventoryKit.count(bag, 'torch');
+                if (left > 0) bag.inventory.torch = burn; else delete bag.inventory.torch;
+                emit(sim, p, 'torch_spent', { left });
+                if (!left) light(sim, p, false);
+            }
         }
     };
     function light(sim, p, on) {

@@ -1,6 +1,6 @@
 // World entities (design.md 6.2): everything in the world that
 // is not one of the fighters -- the training dummy, monsters, buildings,
-// portals, chests, bosses' graves, things dropped, dry thickets, lamps and
+// portals, chests, camps, bosses' graves, things dropped, dry thickets, lamps and
 // resources to gather (ore, crystal, herbs) -- is one plain record on
 // sim.entities: { id, type, x, y, h, facing, radius, solid, ... }. What a
 // record does comes from the kit of its type: core/dummy.js,
@@ -15,7 +15,7 @@
 const entityKit = (() => {
     const KITS = {
         dummy: () => dummyKit, monster: () => monsterKit,
-        building: () => propKit, portal: () => propKit, chest: () => propKit, grave: () => propKit, drop: () => propKit, brush: () => propKit, node: () => propKit, lamp: () => propKit
+        building: () => propKit, portal: () => propKit, chest: () => propKit, grave: () => propKit, drop: () => propKit, brush: () => propKit, node: () => propKit, lamp: () => propKit, camp: () => propKit
     };
     function kitOf(e) {
         const kit = KITS[e?.type];
