@@ -83,7 +83,7 @@ const menuScreen = (() => {
             if (fig) fig.show(p.loadout);
             if (page === 'settings') { settingsPage.render(); return; }
             const stats = K.statsOf(p.loadout);
-            statsEl.innerHTML = ['atk', 'def', 'maxHp'].map(k => `<div><dt>${k === 'maxHp' ? '生命上限' : STAT_NAMES[k]}</dt><dd>${stats[k]}</dd></div>`).join('')
+            statsEl.innerHTML = ['atk', 'def', 'maxHp', 'guard'].map(k => `<div><dt>${k === 'maxHp' ? '生命上限' : STAT_NAMES[k]}</dt><dd>${stats[k]}</dd></div>`).join('')
                 + `<div class="menu-gold"><dt aria-label="金币">${itemScreens.iconHtml('gold')}</dt><dd>${p.inventory.gold}</dd></div>`;
             slotsEl.innerHTML = K.SLOTS.map(slot => {
                 const id = p.loadout[slot];

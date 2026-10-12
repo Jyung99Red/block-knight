@@ -59,8 +59,9 @@ const gameConfig = (() => {
         // fighters.base: the main character's stats before equipment (no
         // levels: equipment is the only growth, design.md 7.1); each
         // item worn adds its own (`items`). The starter gear makes 200 HP
-        // (user, 2026-10-12; it was 360), 30 ATK, 8 DEF; a duel is always
-        // fought in it.
+        // (user, 2026-10-12; it was 360), 30 ATK, 8 DEF, a guard bar of
+        // 100; a duel is always fought in it. `guard`: the guard bar's
+        // points (a sturdier shield adds to it, user 2026-10-12).
         // hitStun: a hit that is not guarded freezes the one struck's
         // controls this long. weaponPad: weapon boxes grow by this much on
         // every side for hit tests only (design.md 4.3).
@@ -73,7 +74,7 @@ const gameConfig = (() => {
         // player, blocks and parries. Stagger: points from moves (and
         // `parry`) fill to `threshold`, then the target reels `duration`.
         combat: {
-            fighters: { base: { maxHp: 180, atk: 22, def: 4 } },
+            fighters: { base: { maxHp: 180, atk: 22, def: 4, guard: 100 } },
             hitStun: 0.35, weaponPad: 8,
             damage: { defenseConstant: 17.5, parryAtkRatio: 0.5 },
             impact: { hitstop: { hit: 0.06, block: 0.04, parry: 0.08 }, knockback: { hit: 10, block: 5, parry: 8 }, knockbackSeconds: 0.12 },
@@ -110,7 +111,8 @@ const gameConfig = (() => {
                 shield: { blockMultiplier: 0.2, blockCost: 28, parryWindow: 0.22 },
                 weapon: { blockMultiplier: 0.3, blockCost: 42, parryWindow: 0.15 }
             },
-            // Guard bar (points). Raising costs raiseCost, holding drains
+            // Guard bar (its points are the `guard` stat, fighters.base plus
+            // the gear). Raising costs raiseCost, holding drains
             // holdDrain a second, a blocked hit costs the guard's blockCost
             // times the blow's weight (a parry parryCostRatio of that). The
             // weight goes by the move's ratio (its motion value, user
@@ -118,7 +120,7 @@ const gameConfig = (() => {
             // twice its ratio 2. Down, the bar refills from empty in
             // refillSeconds; emptied, the guard stays locked until it is
             // back to unlockRatio.
-            guardBar: { max: 100, raiseCost: 10, holdDrain: 10, parryCostRatio: 0.5, refillSeconds: 5, unlockRatio: 0.4 },
+            guardBar: { raiseCost: 10, holdDrain: 10, parryCostRatio: 0.5, refillSeconds: 5, unlockRatio: 0.4 },
             // A potion in the offhand, drunk with the offhand key: a drink takes
             // `seconds`, walking and turning slowed meanwhile, and heals
             // `heal` of max HP at the end; a blow that gets through spills
@@ -347,7 +349,7 @@ const gameConfig = (() => {
             assassin_dagger: { kind: 'gear', slot: 'main', weapon: 'dagger', name: '刺客短刃', icon: '🔪', stats: { atk: 11 }, blade: 0.6, max: 1, recipe: { gold: 40, materials: { wolf_pelt: 2, iron_ore: 2 } }, desc: '短刃。比剑短，要贴得更近；出招快，连段最长六段，起手 B 是往前冲的突刺。' },
             iron_sword: { kind: 'gear', slot: 'main', weapon: 'sword', name: '铁剑', icon: '⚔️', stats: { atk: 16 }, blade: 0.92, max: 1, recipe: { gold: 80, materials: { iron_ore: 5, goblin_ear: 2 } }, desc: '和木剑一样长，铁打的刃，攻击高得多。' },
             wooden_shield: { kind: 'gear', slot: 'offhand', offhand: 'shield', name: '木盾', icon: '🛡️', stats: { def: 2 }, max: 1, desc: '开局带着的盾。按住格挡键用盾挡，比用武器挡更稳。' },
-            iron_shield: { kind: 'gear', slot: 'offhand', offhand: 'shield', name: '铁盾', icon: '🔰', stats: { def: 6 }, max: 1, recipe: { gold: 80, materials: { iron_ore: 4, wolf_pelt: 2 } }, desc: '更结实的盾。' },
+            iron_shield: { kind: 'gear', slot: 'offhand', offhand: 'shield', name: '铁盾', icon: '🔰', stats: { def: 6, guard: 30 }, max: 1, recipe: { gold: 80, materials: { iron_ore: 4, wolf_pelt: 2 } }, desc: '更结实的盾，格挡条更长。' },
             cloth_armor: { kind: 'gear', slot: 'armor', name: '布甲', icon: '👕', stats: { def: 2, maxHp: 20 }, max: 1, desc: '开局穿着的衣服。' },
             iron_armor: { kind: 'gear', slot: 'armor', name: '铁甲', icon: '🥋', stats: { def: 7, maxHp: 40 }, max: 1, recipe: { gold: 100, materials: { iron_ore: 6, wolf_pelt: 3 } }, desc: '加了肩甲和胸甲。' },
             chief_charm: { kind: 'gear', slot: 'accessory', name: '头目护符', icon: '📿', stats: { maxHp: 50 }, max: 1, recipe: { gold: 60, materials: { chief_tusk: 1, herb: 3 } }, desc: '用头目的獠牙打的护符。' },

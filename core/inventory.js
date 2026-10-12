@@ -8,7 +8,7 @@
 // Every change returns '' when done, or why not (a line for the screen).
 const inventoryKit = (() => {
     const SLOTS = Object.freeze(['main', 'offhand', 'armor', 'accessory']);
-    const STATS = Object.freeze(['maxHp', 'atk', 'def']);
+    const STATS = Object.freeze(['maxHp', 'atk', 'def', 'guard']);
     const I = () => gameConfig.items;
     const itemOf = id => (id && Object.hasOwn(gameConfig.items, id) ? gameConfig.items[id] : null);
     const count = (progress, id) => (id === 'gold' ? progress.inventory.gold : progress.inventory.items[id] || 0);

@@ -55,21 +55,21 @@ test('the dummy attacks in reach, its swipe lands during its swing, and an ungua
 
 test('raising costs a little, holding drains, a block costs more than a parry of the same hit', () => {
     const sim = setup(); sim.dummy.wait = 1e9; press(sim, 'guard');
-    assert.equal(sim.player.guard.bar, G.max - G.raiseCost);
-    step(sim, 0.5); assert.ok(Math.abs(sim.player.guard.bar - (G.max - G.raiseCost - G.holdDrain * 0.5)) < 1e-6);
+    assert.equal(sim.player.guard.bar, S.guard - G.raiseCost);
+    step(sim, 0.5); assert.ok(Math.abs(sim.player.guard.bar - (S.guard - G.raiseCost - G.holdDrain * 0.5)) < 1e-6);
     // Raised long before: a block.
     const block = guardAt(setup(), impactTime - 0.8);
     assert.equal(block.stats.blocks, 1); assert.equal(block.stats.parries, 0);
-    assert.ok(Math.abs(G.max - block.player.guard.bar - G.raiseCost - G.holdDrain * (block.time - (impactTime - 0.8)) - cost(false)) < 0.2);
+    assert.ok(Math.abs(S.guard - block.player.guard.bar - G.raiseCost - G.holdDrain * (block.time - (impactTime - 0.8)) - cost(false)) < 0.2);
     // Up just before the hit: a perfect parry, which costs half and hits back.
     const parry = guardAt(setup(), impactTime - GU.startup - 0.05);
     assert.equal(parry.stats.parries, 1);
-    assert.ok(Math.abs(G.max - parry.player.guard.bar - G.raiseCost - G.holdDrain * (parry.time - (impactTime - GU.startup - 0.05)) - cost(true)) < 0.2);
+    assert.ok(Math.abs(S.guard - parry.player.guard.bar - G.raiseCost - G.holdDrain * (parry.time - (impactTime - GU.startup - 0.05)) - cost(true)) < 0.2);
     assert.ok(parry.dummy.hp < parry.dummy.maxHp, 'the parry hits back');
     assert.equal(parry.dummy.stagger, F.stagger.parry);
     // The bar refills only with the shield down.
     release(parry, 'guard'); const low = parry.player.guard.bar; step(parry, 0.3);
-    assert.ok(Math.abs(parry.player.guard.bar - low - G.max / G.refillSeconds * 0.3) < 1e-6);
+    assert.ok(Math.abs(parry.player.guard.bar - low - S.guard / G.refillSeconds * 0.3) < 1e-6);
 });
 
 test('a block costs the guard bar by the blow\'s ratio: the attacker\'s lightest move weighs 1, a heavier one more (user, 2026-10-12)', () => {
@@ -84,6 +84,17 @@ test('a block costs the guard bar by the blow\'s ratio: the attacker\'s lightest
     const light = spent('swipe'), heavy = spent('smash');
     assert.ok(Math.abs(light - GU.shield.blockCost) < 1e-6, `${light}`);
     assert.ok(Math.abs(heavy - GU.shield.blockCost * D.moves[1].ratio / D.moves[0].ratio) < 1e-6, `${heavy}`);
+});
+
+test('the guard bar is a stat: a shield that adds to it holds more, and refills in the same time (user, 2026-10-12)', () => {
+    const shield = Object.keys(gameConfig.items).find(id => gameConfig.items[id].offhand === 'shield' && gameConfig.items[id].stats?.guard > 0);
+    assert.ok(shield, 'some shield adds to the bar');
+    const loadout = { ...gameConfig.gear.starter, offhand: shield }, sim = setup({ loadout }), p = sim.player;
+    assert.equal(p.guardMax, S.guard + gameConfig.items[shield].stats.guard);
+    assert.equal(p.guard.bar, p.guardMax);
+    sim.dummy.wait = 1e9; press(sim, 'guard'); step(sim, 1); release(sim, 'guard');
+    step(sim, G.refillSeconds * (G.raiseCost + G.holdDrain) / p.guardMax + 0.02);
+    assert.equal(p.guard.bar, p.guardMax);
 });
 
 test('a blocked hit does a share of the damage and no stun; from behind the shield does nothing', () => {
@@ -141,7 +152,7 @@ test('a move plays out whole before the shield goes up; a charge is dropped at o
     // Let go before the move ends: nothing goes up.
     const changed = quiet(); tap(changed); step(changed, 0.15);
     press(changed, 'guard'); step(changed, 0.1); release(changed, 'guard'); step(changed, 0.5);
-    assert.equal(changed.player.guard.state, 'down'); assert.equal(changed.player.guard.bar, G.max);
+    assert.equal(changed.player.guard.state, 'down'); assert.equal(changed.player.guard.bar, S.guard);
     // Pressed in the charged windup with B still held, it drops the charge when the windup ends.
     const told = gameConfig.combo.holdSeconds + 0.05;
     const held = quiet(); press(held, 'attack'); step(held, told); press(held, 'guard');
@@ -172,7 +183,7 @@ test('without a shield the weapon guards, weaker: more damage and guard bar per 
         const statsOf = inventoryKit.statsOf(loadout);
         const taken = Math.round(Math.max(1, Math.round(swipeRaw * (1 - statsOf.def / (statsOf.def + F.damage.defenseConstant)))) * GU.weapon.blockMultiplier);
         assert.equal(p.maxHp - p.hp, taken);
-        const spent = G.max - p.guard.bar - G.raiseCost - G.holdDrain * (sim.time - raisedAt), want = cost(false, GU.weapon);
+        const spent = S.guard - p.guard.bar - G.raiseCost - G.holdDrain * (sim.time - raisedAt), want = cost(false, GU.weapon);
         assert.ok(Math.abs(spent - want) < 0.2, `${spent} vs ${want}`);
     }
     // A hit midway between the two windows after the guard is up: the

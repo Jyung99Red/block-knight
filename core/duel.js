@@ -82,7 +82,7 @@ const duelKit = (() => {
         const type = inventoryKit.weaponOf(ref.loadout), ownMove = v => moveId(v) && gameConfig.combo.moves[v].weapon === type;
         if (!obj(f) || f.id !== ref.id || f.side !== ref.side || f.kind !== 'fighter') return false;
         if (!within(f.x, 0, t.width * t.unit) || !within(f.y, 0, t.height * t.unit) || !num(f.h) || !num(f.facing)) return false;
-        if (f.radius !== ref.radius || f.maxHp !== ref.maxHp || f.atk !== ref.atk || f.def !== ref.def || f.endless !== ref.endless) return false;
+        if (f.radius !== ref.radius || f.maxHp !== ref.maxHp || f.atk !== ref.atk || f.def !== ref.def || f.guardMax !== ref.guardMax || f.endless !== ref.endless) return false;
         if (!within(f.hp, 0, f.maxHp) || !bool(f.down) || !obj(f.loadout) || f.loadout.main !== ref.loadout.main || f.loadout.offhand !== ref.loadout.offhand) return false;
         if (!['speed', 'gait', 'moveBlend', 'runBlend', 'moveTime', 'downT', 'guardBlend'].every(k => num(f[k])) || !within(f.pace, 0, 1) || !within(f.stun, 0, 10) || !within(f.freeze, 0, 10) || !within(f.shoveOut, 0, 1) || !within(f.shoveFor, 0, 10)) return false;
         const i = f.input;
@@ -90,7 +90,7 @@ const duelKit = (() => {
         if (Object.keys(i.buttons).length !== worldSim.BUTTONS.length || !worldSim.BUTTONS.every(b => obj(i.buttons[b]) && bool(i.buttons[b].held) && count(i.buttons[b].presses))) return false;
         if (!obj(f.stats) || !Object.keys(ref.stats).every(k => count(f.stats[k]))) return false;
         const g = f.guard;
-        if (!obj(g) || !['down', 'raising', 'up'].includes(g.state) || !num(g.t) || !num(g.readyAt) || !within(g.bar, 0, gameConfig.combat.guardBar.max) || !bool(g.locked) || !bool(g.queued)) return false;
+        if (!obj(g) || !['down', 'raising', 'up'].includes(g.state) || !num(g.t) || !num(g.readyAt) || !within(g.bar, 0, ref.guardMax) || !bool(g.locked) || !bool(g.queued)) return false;
         if (f.push !== null && !(obj(f.push) && num(f.push.x) && num(f.push.y) && num(f.push.t))) return false;
         const k = f.press;
         if (k !== null && !(obj(k) && num(k.at) && bool(k.held) && (k.upAt === null || num(k.upAt)) && [null, 'a', 'b'].includes(k.as) && bool(k.free))) return false;

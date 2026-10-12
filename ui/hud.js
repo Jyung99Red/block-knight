@@ -178,10 +178,10 @@ const hud = (() => {
         // background), entering (the host's world not here yet) }.
         function update(sim, view, now, bodies = null, { self = 'player', duel = null, coop = null } = {}) {
             selfId = self;
-            const p = sim.fighters.find(f => f.id === self) || sim.fighters[0], G = gameConfig.combat.guardBar;
+            const p = sim.fighters.find(f => f.id === self) || sim.fighters[0];
             const shownOf = body => bodies?.get(body.id) || body;
             width(els.hp, p.hp / p.maxHp);
-            width(els.guard, p.guard.bar / G.max);
+            width(els.guard, p.guard.bar / p.guardMax);
             els.guardBar.classList.toggle('locked', p.guard.locked);
             // The guard key shows what it guards with: the shield, or the blade.
             els.guardKey.dataset.kind = combatKit.guardOf(p);

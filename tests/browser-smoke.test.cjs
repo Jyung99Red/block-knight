@@ -15,6 +15,7 @@
 // saves screenshots there.
 const { test, before, after } = require('node:test');
 const assert = require('node:assert/strict');
+const rules = require('./load.cjs').load();
 const fs = require('node:fs'), path = require('node:path'), http = require('node:http');
 const root = path.join(__dirname, '..');
 
@@ -556,7 +557,7 @@ test('items: the smithy makes iron armor, the bag puts it on (the model changes)
         await shot(page, 'bag');
         await page.click('[data-menu-act="close"]');
         const worn = await page.evaluate(() => { const g = window.game, p = g.sim.player; return { map: g.map, parts: g.sim.rigs.fighters.player.parts.length, x: p.x, maxHp: p.maxHp, def: p.def, offhand: p.loadout.offhand, saved: g.save.loadout.armor }; });
-        assert.deepEqual({ ...worn, parts: undefined }, { map: 'base', parts: undefined, x: before.x, maxHp: 380, def: 11, offhand: 'potion', saved: 'iron_armor' });
+        assert.deepEqual({ ...worn, parts: undefined }, { map: 'base', parts: undefined, x: before.x, maxHp: rules.inventoryKit.statsOf({ ...rules.gameConfig.gear.starter, armor: 'iron_armor' }).maxHp, def: 11, offhand: 'potion', saved: 'iron_armor' });
         assert.ok(worn.parts > before.parts, 'the iron armor adds plates to the model');
         // No shield now: the guard key shows the blade; the offhand key the
         // potion and how many are left.
@@ -565,7 +566,7 @@ test('items: the smithy makes iron armor, the bag puts it on (the model changes)
         await page.evaluate(() => { window.game.sim.player.hp = 100; });
         await page.keyboard.press('KeyK');
         await page.evaluate(() => window.game.run(0.9));
-        assert.deepEqual(await page.evaluate(() => [window.game.sim.player.hp, window.game.sim.progress.inventory.items.potion]), [214, 1]);
+        assert.deepEqual(await page.evaluate(() => [window.game.sim.player.hp, window.game.sim.progress.inventory.items.potion]), [100 + Math.round(worn.maxHp * rules.gameConfig.combat.potion.heal), 1]);
         // Outside the base the bag only shows: no changing gear. The menu
         // does not pause the world (user, 2026-10-02); its pause button does.
         await page.evaluate(() => window.game.load('field'));

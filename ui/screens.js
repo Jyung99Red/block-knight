@@ -10,7 +10,7 @@
 // gear drawn from its own model (render/figure_view.js), else its emoji.
 const itemScreens = (() => {
     const SLOT_NAMES = Object.freeze({ main: '主手', offhand: '副手', armor: '护甲', accessory: '饰品' });
-    const STAT_NAMES = Object.freeze({ maxHp: '生命', atk: '攻击', def: '防御' });
+    const STAT_NAMES = Object.freeze({ maxHp: '生命', atk: '攻击', def: '防御', guard: '格挡' });
     const esc = text => String(text).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
     function iconHtml(id) {
         const url = figureView.icon(id);

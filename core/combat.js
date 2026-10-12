@@ -64,11 +64,11 @@ const combatKit = (() => {
         emit(sim, 'guard_broken', { side: body.side });
     }
     function tickGuardBar(sim, body, dt) {
-        const g = body.guard, G = C().guardBar;
+        const g = body.guard, G = C().guardBar, max = body.guardMax;
         if (g.state !== 'down') { spendGuard(sim, body, G.holdDrain * dt); return; }
-        if (g.bar >= G.max) return;
-        g.bar = Math.min(G.max, g.bar + G.max / G.refillSeconds * dt);
-        if (g.locked && g.bar >= G.max * G.unlockRatio - 1e-9) { g.locked = false; emit(sim, 'guard_ready', { side: body.side }); }
+        if (g.bar >= max) return;
+        g.bar = Math.min(max, g.bar + max / G.refillSeconds * dt);
+        if (g.locked && g.bar >= max * G.unlockRatio - 1e-9) { g.locked = false; emit(sim, 'guard_ready', { side: body.side }); }
     }
 
     // ---- a blow meets a fighter: a block, a perfect parry, or a hit ----

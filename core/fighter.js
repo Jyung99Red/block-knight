@@ -54,16 +54,17 @@ const fighterKit = (() => {
     const heavyOf = m => m.knockback > 0 || m.stagger > 0;
 
     // `endless`: an emptied HP bar refills (training) instead of falling.
-    // `stats`: HP, ATK and DEF (the base plus gear, core/inventory.js).
+    // `stats`: HP, ATK, DEF and the guard bar's points (the base plus
+    // gear, core/inventory.js).
     function init(p, { id = 'player', endless = true, stats = inventoryKit.statsOf(inventoryKit.starter()) } = {}) {
         const buttons = {};
         for (const b of BUTTONS) buttons[b] = { held: false, presses: 0 };
         return Object.assign(p, {
-            id, side: id, kind: 'fighter', hp: stats.maxHp, maxHp: stats.maxHp, atk: stats.atk, def: stats.def, endless,
+            id, side: id, kind: 'fighter', hp: stats.maxHp, maxHp: stats.maxHp, atk: stats.atk, def: stats.def, guardMax: stats.guard, endless,
             input: { move: { x: 0, y: 0 }, buttons },
             stats: { attacks: 0, hits: 0, misses: 0, blocks: 0, parries: 0, hurt: 0, kills: 0 },
             act: null, chain: null, buffer: null, combo: [], stun: 0, freeze: 0, push: null, press: null, down: false, downT: 0, rising: 0, focus: null, using: null, handOut: 0, handFor: 0, drink: null, lit: false, reveal: 0,
-            guard: { state: 'down', t: 0, readyAt: -1, bar: F().guardBar.max, locked: false, queued: false }, guardBlend: 0, shoveOut: 0, shoveFor: 0
+            guard: { state: 'down', t: 0, readyAt: -1, bar: stats.guard, locked: false, queued: false }, guardBlend: 0, shoveOut: 0, shoveFor: 0
         });
     }
     // Everyone a fighter can hit: the training dummy, living monsters, and
