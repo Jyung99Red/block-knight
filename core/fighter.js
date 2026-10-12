@@ -158,6 +158,8 @@ const fighterKit = (() => {
         if (!b || b.at !== act.pressAt) return 0;
         return Math.min(C.full, (b.held ? sim.time : b.upAt) - b.at);
     }
+    // Charging, and the charge is full (it shakes: core/player_anim.js).
+    const chargeFull = (sim, p) => p.act?.phase === 'charge' && chargeOf(sim, p, p.act) >= F().charge.full - 1e-9;
     // `charged`: the swing comes out of a held charge. Let go before the
     // windup was over, it is the minimum charge (design.md 4.1).
     function beginSwing(sim, p, charged = false) {
@@ -225,9 +227,10 @@ const fighterKit = (() => {
     function land(sim, { p, a, hit, foe }) {
         const m = moveOf(a.move), raw = p.atk * (m.ratio + (m.chargeRatio || 0) * a.share), heavy = heavyOf(m);
         // Another fighter has a shield and stun of its own (a duel): only a
-        // heavy move breaks its combo (design.md 4.4).
+        // heavy move breaks its combo (design.md 4.4), or one that breaks
+        // the guard it meets.
         if (foe.kind === 'fighter') {
-            combatKit.strike(sim, foe, p, raw, hit.point, { move: a.move, heavy, stun: heavy, knockback: m.knockback });
+            combatKit.strike(sim, foe, p, raw, hit.point, { move: a.move, heavy, stun: heavy, knockback: m.knockback, pierce: !!m.guardBreak });
             return;
         }
         const amount = combatKit.defended(raw, foe.def);
@@ -538,6 +541,9 @@ const fighterKit = (() => {
             beginSwing(sim, p);
         } else if (a.phase === 'charge') {
             a.t += dt;
+            // Held fullHold past the full charge, the cut goes by itself.
+            const C = F().charge;
+            if (p.press?.held && p.press.at === a.pressAt && sim.time - p.press.at >= C.full + C.fullHold - 1e-9) beginSwing(sim, p, true);
         } else if (a.phase === 'swing') {
             swingStep(sim, p, dt);
         } else {
@@ -551,5 +557,5 @@ const fighterKit = (() => {
             }
         }
     }
-    return { BUTTONS, init, press, release, tick, settle, struck, fall, offer, use, foes, solve, hurtboxes, derive, chargeOf, rigOf, light, hidden, ITEMS };
+    return { BUTTONS, init, press, release, tick, settle, struck, fall, offer, use, foes, solve, hurtboxes, derive, chargeOf, chargeFull, rigOf, light, hidden, ITEMS };
 })();

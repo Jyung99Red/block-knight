@@ -71,13 +71,17 @@ const combatKit = (() => {
     // ---- a blow meets a fighter: a block, a perfect parry, or a hit ----
     // `raw` is the blow before DEF; `point` (blocks) is only for effects.
     // blow: { move, heavy, stun (a hit breaks the combo), knockback (how far
-    // a hit pushes) }. A foe's blow always stuns and pushes the standard
-    // distance; a fighter's own move says (fighterKit, a duel).
-    function strike(sim, victim, attacker, raw, point, { move, heavy = false, stun = true, knockback = C().impact.knockback.hit } = {}) {
+    // a hit pushes), pierce (a guard does not stop it: only a perfect parry
+    // does, and the guard it breaks is a hit that stuns) }. A foe's blow
+    // always stuns and pushes the standard distance; a fighter's own move
+    // says (fighterKit, a duel).
+    function strike(sim, victim, attacker, raw, point, { move, heavy = false, stun = true, knockback = C().impact.knockback.hit, pierce = false } = {}) {
         const v = victim, fighter = attacker.kind === 'fighter';
+        let pierced = false;
         if (v.guard.state === 'up' && inFront(v, attacker)) {
             const G = guardBy(v), parry = sim.time - v.guard.readyAt <= G.parryWindow + 1e-9;
-            if (parry) {
+            if (!parry && pierce) pierced = true;
+            else if (parry) {
                 const counter = defended(v.atk * C().damage.parryAtkRatio, attacker.def);
                 v.stats.parries++;
                 emit(sim, 'parry', { side: v.side, target: attacker.id, damage: counter, at: point });
@@ -92,14 +96,17 @@ const combatKit = (() => {
                 emit(sim, 'block', { side: v.side, source: attacker.id, damage: amount, at: point, with: guardOf(v) });
                 impact(sim, v, attacker, 'block');
             }
-            // Paid after the hit is settled: the block that empties the bar still counts.
-            spendGuard(sim, v, guardCost(raw, v, parry));
-            if (v.hp === 0) fighterKit.fall(sim, v);
-            return;
+            if (!pierced) {
+                // Paid after the hit is settled: the block that empties the bar still counts.
+                spendGuard(sim, v, guardCost(raw, v, parry));
+                if (v.hp === 0) fighterKit.fall(sim, v);
+                return;
+            }
         }
         const amount = defended(raw, v.def);
+        if (pierced) stun = true;
         if (fighter) attacker.stats.hits++;
-        emit(sim, 'hit', { side: attacker.side, source: attacker.id, target: v.id, move, damage: amount, heavy, at: point });
+        emit(sim, 'hit', { side: attacker.side, source: attacker.id, target: v.id, move, damage: amount, heavy, at: point, ...(pierced ? { pierced: true } : {}) });
         fighterKit.struck(sim, v, { amount, stun });
         if (!v.down) impact(sim, v, attacker, 'hit', stun ? knockback : 0);
     }

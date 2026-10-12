@@ -367,10 +367,11 @@ const playerAnim = (() => {
         const air = lift(rig, body.gait, body.runBlend || 0) * body.moveBlend * stepping;
         return air > 0 ? rigKit.add(grounded(rig, pose), { base: { py: air } }) : grounded(rig, pose);
     }
-    // Drawn-only additions. `look` = { time, lean } (lean in radians).
+    // Drawn-only additions. `look` = { time, lean (radians), full (a charge
+    // is full: it shakes, user 2026-10-12) }.
     function present(judged, body, look) {
         const B = playerPoses.breath, s = Math.sin(look.time * B.rate) * (1 - body.moveBlend) * (body.act || body.down ? 0 : 1);
-        const shake = body.act?.phase === 'charge' ? Math.sin(look.time * 70) * 0.012 : 0;
+        const shake = look.full && body.act?.phase === 'charge' ? Math.sin(look.time * 70) * 0.012 : 0;
         return rigKit.add(judged, {
             base: { rz: look.lean || 0 },
             chest: { rx: B.chest * s, ry: shake }, head: { rx: B.head * s },

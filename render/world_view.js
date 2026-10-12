@@ -413,7 +413,7 @@ const worldView = (() => {
                 entry.lastFacing = p.facing;
                 const leanTarget = Math.max(-0.12, Math.min(0.12, 0.015 * omega)) * p.moveBlend;
                 entry.lean += (leanTarget - entry.lean) * Math.min(1, frameSeconds * 10);
-                const pose = playerAnim.present(playerAnim.pose(entry.rig, p), p, { time: clock, lean: entry.lean });
+                const pose = playerAnim.present(playerAnim.pose(entry.rig, p), p, { time: clock, lean: entry.lean, full: fighterKit.chargeFull(current, f) });
                 // (Solved into the same matrices every frame: what reads them keeps none.)
                 const solved = entry.solved = rigKit.solve(entry.rig, pose, space.toBlocks(p.x, p.y, p.h), space.yawOf(p.facing), entry.solved);
                 entry.view.place(solved);

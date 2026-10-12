@@ -23,7 +23,7 @@ const step = (sim, seconds, opts) => { for (let i = 0; i < Math.round(seconds / 
 const tap = (sim, who, button = 'attack') => { W.command(sim, { type: 'press', button }, who); W.command(sim, { type: 'release', button }, who); };
 
 test('a duel: two mortal fighters with the same stats, on the arena spawns, face to face, in sight', () => {
-    const sim = duel(), [h, g] = sim.fighters, S = inventoryKit.statsOf(inventoryKit.starter());
+    const sim = duel(), [h, g] = sim.fighters, S = { ...inventoryKit.statsOf(inventoryKit.starter()), maxHp: gameConfig.pvp.maxHp };
     assert.deepEqual(plain(sim.fighters.map(f => f.id)), ['host', 'guest']);
     assert.equal(sim.player, h, 'sim.player is the first fighter');
     for (const f of sim.fighters) {
@@ -90,6 +90,27 @@ test('the shield blocks and parries the same for host and guest', () => {
             assert.equal(d.stats.blocks, 1);
             assert.equal(d.hp, d.maxHp - Math.round(Math.max(1, Math.round(raw * (1 - d.def / (d.def + F.damage.defenseConstant)))) * F.guard.shield.blockMultiplier));
             assert.equal(a.hp, a.maxHp);
+        }
+    }
+});
+
+test('the sword\'s thrust (A A · A) breaks a guard: a hit that stuns; a perfect parry still stops it (user, 2026-10-12)', () => {
+    for (const parry of [false, true]) {
+        const sim = facing(duel()), [h, g] = sim.fighters;
+        W.command(sim, { type: 'press', button: 'guard' }, 1);
+        step(sim, parry ? F.guard.startup + 0.01 - M.thrust.windup - 0.04 : 0.5);
+        // Straight into the thrust, as the pause line would start it.
+        h.act = { move: 'thrust', phase: 'windup', t: 0, lead: 0, facing: h.facing, pressAt: sim.time, share: 0, stepTotal: M.thrust.step, hit: [], from: null };
+        step(sim, M.thrust.windup + M.thrust.swing + 0.1);
+        if (parry) {
+            assert.equal(g.stats.parries, 1);
+            assert.equal(g.hp, g.maxHp);
+        } else {
+            assert.equal(g.stats.blocks, 0);
+            assert.equal(g.hp, g.maxHp - Math.max(1, Math.round(h.atk * M.thrust.ratio * (1 - g.def / (g.def + F.damage.defenseConstant)))), 'the whole blow');
+            assert.equal(g.guard.state, 'down', 'the guard is broken');
+            assert.ok(g.stun > 0, 'and the guest stunned');
+            assert.ok(sim.events.some(e => e.type === 'hit' && e.pierced));
         }
     }
 });
@@ -305,9 +326,10 @@ test('only the host changes HP; the guest sees it with the next snapshot', () =>
     const hp = () => p.guest.sim.fighters.map(f => f.hp);
     press(p.guest, 'attack'); release(p.guest, 'attack');
     for (let i = 0; i < 25; i++) p.guest.frame(0.01);
-    assert.deepEqual(plain(hp()), [360, 360], 'the guest\'s own cut decides nothing');
+    const full = gameConfig.pvp.maxHp;
+    assert.deepEqual(plain(hp()), [full, full], 'the guest\'s own cut decides nothing');
     p.run(0.4);
-    assert.ok(p.host.sim.fighters[0].hp < 360);
+    assert.ok(p.host.sim.fighters[0].hp < full);
     assert.deepEqual(plain(hp()), plain(p.host.sim.fighters.map(f => f.hp)));
     assert.equal(p.shown.guest.filter(e => e.type === 'hit').length, 1);
     assert.equal(p.shown.host.filter(e => e.type === 'hit').length, 1);

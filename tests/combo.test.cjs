@@ -147,8 +147,14 @@ test('opening B: windup at once, charges while held, cuts on release; A then fol
     assert.equal(phase(sim), 'windup:charged');
     until(sim, 'charge:charged');
     assert.ok(Math.abs(sim.time - M.charged.windup) < 0.011, 'held past the windup, it charges');
-    step(sim, 1); assert.equal(phase(sim), 'charge:charged', 'a charge never fires by itself');
+    step(sim, 1); assert.equal(phase(sim), 'charge:charged', 'a charge does not fire by itself before it is full');
     release(sim, 'attack'); assert.equal(phase(sim), 'swing:charged');
+    // Held fullHold past the full charge, it cuts by itself, full (user, 2026-10-12).
+    const held = setup(); holdB(held);
+    until(held, 'swing:charged', C.full + C.fullHold + 0.5);
+    assert.ok(Math.abs(held.time - C.full - C.fullHold) < 0.011, `cut at ${held.time}`);
+    assert.equal(held.player.act.share, 1);
+    release(held, 'attack'); assert.equal(phase(held), 'swing:charged', 'letting go after changes nothing');
     const share = (1 + M.charged.windup - C.threshold) / (C.full - C.threshold);
     assert.ok(Math.abs(sim.player.act.share - share) < 0.02, `charge share ${sim.player.act.share}`);
     until(sim, 'recover:charged'); tap(sim); until(sim, 'windup:follow');

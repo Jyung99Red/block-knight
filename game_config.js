@@ -79,8 +79,10 @@ const gameConfig = (() => {
             stagger: { threshold: 3, duration: 1.5, parry: 1 },
             // The opening B: held past its windup it charges. Charge time
             // counts from the press; damage grows from `threshold` to `full`
-            // seconds. While charging the body walks and turns slower.
-            charge: { threshold: 0.3, full: 2.3, moveMultiplier: 0.6, turnMultiplier: 0.65 },
+            // seconds. While charging the body walks and turns slower. Full,
+            // the body shakes, and held `fullHold` seconds more the cut
+            // goes by itself (user, 2026-10-12).
+            charge: { threshold: 0.3, full: 2.3, fullHold: 2, moveMultiplier: 0.6, turnMultiplier: 0.65 },
             // The guard key: guarding is the defence, there is no dodge
             // (user, 2026-10-03). `startup` from press to up; only hits from
             // within frontAngle of facing are blocked (60 degrees either
@@ -136,7 +138,9 @@ const gameConfig = (() => {
         // knockback: world units the target is pushed; step: how far the
         // body moves along its facing during the swing (negative: back). A
         // `charge` move grows ratio by chargeRatio and step by chargeStep
-        // with its charge. Shapes and reach come from the key poses
+        // with its charge. `guardBreak`: a guard does not stop it, only a
+        // perfect parry does; a guard it breaks is a hit that stuns, in a
+        // duel too (user, 2026-10-12). Shapes and reach come from the key poses
         // (models/player_moves.js).
         // weapons.<type>.pauseAfterRecovery: the pause line after a
         // recovery ends (the sword's a little sooner, user 2026-10-02);
@@ -161,7 +165,7 @@ const gameConfig = (() => {
                 slash: { weapon: 'sword', name: '斜斩', windup: 0.13, swing: 0.10, recovery: 0.32, derive: 0.15, ratio: 0.36, stagger: 0, knockback: 0, step: 3, next: { a: 'backslash', b: 'rising' } },
                 backslash: { weapon: 'sword', name: '回扫', windup: 0.13, swing: 0.10, recovery: 0.39, derive: 0.17, ratio: 0.38, stagger: 0, knockback: 0, step: 3, next: { a: 'smite', b: 'cleave', pause: 'thrust' } },
                 smite: { weapon: 'sword', name: '重斩', windup: 0.25, swing: 0.16, recovery: 0.55, ratio: 0.52, stagger: 0, knockback: 0, step: 8 },
-                thrust: { weapon: 'sword', name: '连刺', windup: 0.30, swing: 0.08, recovery: 0.56, ratio: 0.61, stagger: 0, knockback: 0, step: 15 },
+                thrust: { weapon: 'sword', name: '连刺', windup: 0.30, swing: 0.08, recovery: 0.56, ratio: 0.61, stagger: 0, knockback: 0, step: 15, guardBreak: true },
                 rising: { weapon: 'sword', name: '上挑', windup: 0.38, swing: 0.12, recovery: 0.57, ratio: 0.74, stagger: 2, knockback: 16, step: 3 },
                 cleave: { weapon: 'sword', name: '下劈', windup: 0.38, swing: 0.10, recovery: 0.59, ratio: 0.80, stagger: 2, knockback: 16, step: 5 },
                 charged: { weapon: 'sword', name: '蓄力斩', windup: 0.54, swing: 0.14, recovery: 0.63, derive: 0.30, ratio: 0.36, chargeRatio: 0.96, stagger: 2, knockback: 20, step: 4, chargeStep: 13, charge: true, next: { a: 'follow' } },
@@ -1078,8 +1082,10 @@ const gameConfig = (() => {
         // connectSeconds: how long finding the other phone may take.
         // weapons: the main hands each side may pick before a duel (user
         // 2026-10-02: one of each weapon type); the rest is gear.starter.
+        // maxHp: both duellists' HP, whatever the gear makes (user,
+        // 2026-10-12: the starter's 360 made duels too long).
         pvp: {
-            countdown: 3, snapshotSeconds: 0.05, heartbeatSeconds: 0.25, timeoutSeconds: 5, awaySeconds: 60,
+            maxHp: 200, countdown: 3, snapshotSeconds: 0.05, heartbeatSeconds: 0.25, timeoutSeconds: 5, awaySeconds: 60,
             replaySeconds: 0.25, latencySeconds: 0.15, steer: 0.1, resyncSeconds: 0.1, historyEvents: 128, connectSeconds: 12,
             weapons: ['wooden_sword', 'assassin_dagger']
         },
