@@ -47,10 +47,13 @@ const combatKit = (() => {
     // weapon. Its numbers (combat.guard.shield / .weapon).
     function guardOf(body) { return inventoryKit.offhandOf(body.loadout) === 'shield' ? 'shield' : 'weapon'; }
     const guardBy = body => C().guard[guardOf(body)];
-    function guardCost(raw, body, parry) {
-        const G = C().guardBar;
-        return raw / body.maxHp * guardBy(body).blockCostScale * G.max * (parry ? G.parryCostRatio : 1);
+    // A block of a blow of weight `heft` (`heft`).
+    function guardCost(heft, body, parry) {
+        return guardBy(body).blockCost * heft * (parry ? C().guardBar.parryCostRatio : 1);
     }
+    // A blow's weight on the guard bar: its ratio against the lightest of
+    // the attacker's moves (`ratios`), which weighs 1 (user, 2026-10-12).
+    const heft = (ratio, ratios) => ratio / Math.min(...ratios);
     // Every guard cost goes through here. An empty bar drops the guard and
     // locks it until the bar refills to unlockRatio.
     function spendGuard(sim, body, amount) {
@@ -72,10 +75,11 @@ const combatKit = (() => {
     // `raw` is the blow before DEF; `point` (blocks) is only for effects.
     // blow: { move, heavy, stun (a hit breaks the combo), knockback (how far
     // a hit pushes), pierce (a guard does not stop it: only a perfect parry
-    // does, and the guard it breaks is a hit that stuns) }. A foe's blow
+    // does, and the guard it breaks is a hit that stuns), weight (on the
+    // guard bar: `heft`) }. A foe's blow
     // always stuns and pushes the standard distance; a fighter's own move
     // says (fighterKit, a duel).
-    function strike(sim, victim, attacker, raw, point, { move, heavy = false, stun = true, knockback = C().impact.knockback.hit, pierce = false } = {}) {
+    function strike(sim, victim, attacker, raw, point, { move, heavy = false, stun = true, knockback = C().impact.knockback.hit, pierce = false, weight = 1 } = {}) {
         const v = victim, fighter = attacker.kind === 'fighter';
         let pierced = false;
         if (v.guard.state === 'up' && inFront(v, attacker)) {
@@ -98,7 +102,7 @@ const combatKit = (() => {
             }
             if (!pierced) {
                 // Paid after the hit is settled: the block that empties the bar still counts.
-                spendGuard(sim, v, guardCost(raw, v, parry));
+                spendGuard(sim, v, guardCost(weight, v, parry));
                 if (v.hp === 0) fighterKit.fall(sim, v);
                 return;
             }
@@ -184,5 +188,5 @@ const combatKit = (() => {
         }
         return false;
     }
-    return { kitOf, defended, emit, damage, impact, tickPush, guardOf, guardCost, spendGuard, tickGuardBar, strike, hurtboxes, attackBoxes, weaponBoxes, contacts, sweep, inFront, sees };
+    return { kitOf, defended, emit, damage, impact, tickPush, guardOf, guardCost, heft, spendGuard, tickGuardBar, strike, hurtboxes, attackBoxes, weaponBoxes, contacts, sweep, inFront, sees };
 })();

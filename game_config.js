@@ -91,8 +91,9 @@ const gameConfig = (() => {
             // decides the rest: the shield when one is carried, else the
             // weapon, weaker (user: shield 120, weapon 80 against the old
             // shield's 100). blockMultiplier: the share of the damage a
-            // block lets through; blockCostScale: what a block costs of the
-            // guard bar; a hit within parryWindow of the guard coming up is a
+            // block lets through; blockCost: what a block of an ordinary
+            // blow costs of the guard bar (a full bar takes about three on
+            // the shield, user 2026-10-12; see guardBar); a hit within parryWindow of the guard coming up is a
             // perfect parry. shove: a perfect parry pushes the shield (or
             // the weapon hand) forward, as if throwing the blow back (user,
             // 2026-10-06): first it gives -- over `in` seconds, inside the
@@ -106,15 +107,18 @@ const gameConfig = (() => {
             guard: {
                 startup: 0.16, moveMultiplier: 0.3, turnMultiplier: 0.5, frontAngle: Math.PI / 3,
                 shove: { in: 0.06, give: 0.4, out: 0.1, back: 0.24 },
-                shield: { blockMultiplier: 0.2, blockCostScale: 2, parryWindow: 0.22 },
-                weapon: { blockMultiplier: 0.3, blockCostScale: 3, parryWindow: 0.15 }
+                shield: { blockMultiplier: 0.2, blockCost: 28, parryWindow: 0.22 },
+                weapon: { blockMultiplier: 0.3, blockCost: 42, parryWindow: 0.15 }
             },
             // Guard bar (points). Raising costs raiseCost, holding drains
-            // holdDrain a second, a blocked hit costs
-            // raw / maxHp * blockCostScale * max (a parry parryCostRatio of
-            // that). Down, it refills in refillSeconds; emptied, the guard
-            // stays locked until it is back to unlockRatio.
-            guardBar: { max: 100, raiseCost: 10, holdDrain: 10, parryCostRatio: 0.5, refillSeconds: 3, unlockRatio: 0.4 },
+            // holdDrain a second, a blocked hit costs the guard's blockCost
+            // times the blow's weight (a parry parryCostRatio of that). The
+            // weight goes by the move's ratio (its motion value, user
+            // 2026-10-12): the attacker's lightest move weighs 1, a move of
+            // twice its ratio 2. Down, the bar refills from empty in
+            // refillSeconds; emptied, the guard stays locked until it is
+            // back to unlockRatio.
+            guardBar: { max: 100, raiseCost: 10, holdDrain: 10, parryCostRatio: 0.5, refillSeconds: 5, unlockRatio: 0.4 },
             // A potion in the offhand, drunk with the offhand key: a drink takes
             // `seconds`, walking and turning slowed meanwhile, and heals
             // `heal` of max HP at the end; a blow that gets through spills

@@ -69,7 +69,7 @@ const dummyKit = (() => {
         if (targets.length) {
             const solveAt = u => rigKit.solve(sim.rigs.dummy, pose({ ...d, t: u * move.swing }), space.toBlocks(d.x, d.y, d.h), space.yawOf(d.facing));
             const hit = combatKit.sweep(sim.rigs.dummy, solveAt, u0, u1, targets.map(f => ({ id: f.id, boxes: fighterKit.hurtboxes(sim, f) })));
-            if (hit) { d.struck = true; combatKit.strike(sim, targets.find(f => f.id === hit.id), d, d.atk * move.ratio, hit.point, { move: move.id }); }
+            if (hit) { d.struck = true; combatKit.strike(sim, targets.find(f => f.id === hit.id), d, d.atk * move.ratio, hit.point, { move: move.id, weight: combatKit.heft(move.ratio, D().moves.map(o => o.ratio)) }); }
         }
         if (d.phase === 'swing' && d.t >= move.swing - 1e-9) { d.phase = 'recover'; d.t = 0; }
     }

@@ -28,7 +28,7 @@ const impactTime = (() => {
     for (let i = 0; i < 400; i++) { W.step(sim, 0.01); if (sim.stats.hurt) return sim.time; }
     throw new Error('the dummy never reached the player');
 })();
-const swipeRaw = D.atk * D.moves[0].ratio, cost = (parry, by = GU.shield) => swipeRaw / S.maxHp * by.blockCostScale * G.max * (parry ? G.parryCostRatio : 1);
+const swipeRaw = D.atk * D.moves[0].ratio, cost = (parry, by = GU.shield) => by.blockCost * (parry ? G.parryCostRatio : 1);
 // Run to `t`, raise the shield then, and run through the impact.
 function guardAt(sim, t) {
     step(sim, t - sim.time); press(sim, 'guard');
@@ -70,6 +70,20 @@ test('raising costs a little, holding drains, a block costs more than a parry of
     // The bar refills only with the shield down.
     release(parry, 'guard'); const low = parry.player.guard.bar; step(parry, 0.3);
     assert.ok(Math.abs(parry.player.guard.bar - low - G.max / G.refillSeconds * 0.3) < 1e-6);
+});
+
+test('a block costs the guard bar by the blow\'s ratio: the attacker\'s lightest move weighs 1, a heavier one more (user, 2026-10-12)', () => {
+    const spent = move => {
+        const sim = setup(), p = sim.player, d = sim.dummy;
+        d.wait = 1e9; press(sim, 'guard'); step(sim, 0.5);
+        const before = p.guard.bar, m = D.moves.find(o => o.id === move);
+        g.combatKit.strike(sim, p, d, d.atk * m.ratio, [0, 0, 0], { move, weight: g.combatKit.heft(m.ratio, D.moves.map(o => o.ratio)) });
+        assert.equal(sim.stats.blocks, 1);
+        return before - p.guard.bar;
+    };
+    const light = spent('swipe'), heavy = spent('smash');
+    assert.ok(Math.abs(light - GU.shield.blockCost) < 1e-6, `${light}`);
+    assert.ok(Math.abs(heavy - GU.shield.blockCost * D.moves[1].ratio / D.moves[0].ratio) < 1e-6, `${heavy}`);
 });
 
 test('a blocked hit does a share of the damage and no stun; from behind the shield does nothing', () => {
@@ -148,7 +162,7 @@ test('with the guard up A and B do nothing', () => {
 });
 
 test('without a shield the weapon guards, weaker: more damage and guard bar per block, a shorter parry window (user, 2026-10-03)', () => {
-    assert.ok(GU.weapon.blockMultiplier > GU.shield.blockMultiplier && GU.weapon.blockCostScale > GU.shield.blockCostScale && GU.weapon.parryWindow < GU.shield.parryWindow);
+    assert.ok(GU.weapon.blockMultiplier > GU.shield.blockMultiplier && GU.weapon.blockCost > GU.shield.blockCost && GU.weapon.parryWindow < GU.shield.parryWindow);
     for (const offhand of [null, 'torch', 'potion']) {
         const loadout = { ...gameConfig.gear.starter, offhand }, sim = setup({ loadout }), p = sim.player;
         assert.equal(g.combatKit.guardOf(p), 'weapon', String(offhand));
@@ -158,7 +172,7 @@ test('without a shield the weapon guards, weaker: more damage and guard bar per 
         const statsOf = inventoryKit.statsOf(loadout);
         const taken = Math.round(Math.max(1, Math.round(swipeRaw * (1 - statsOf.def / (statsOf.def + F.damage.defenseConstant)))) * GU.weapon.blockMultiplier);
         assert.equal(p.maxHp - p.hp, taken);
-        const spent = G.max - p.guard.bar - G.raiseCost - G.holdDrain * (sim.time - raisedAt), want = swipeRaw / p.maxHp * GU.weapon.blockCostScale * G.max;
+        const spent = G.max - p.guard.bar - G.raiseCost - G.holdDrain * (sim.time - raisedAt), want = cost(false, GU.weapon);
         assert.ok(Math.abs(spent - want) < 0.2, `${spent} vs ${want}`);
     }
     // A hit midway between the two windows after the guard is up: the

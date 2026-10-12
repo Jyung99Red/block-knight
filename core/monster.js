@@ -397,7 +397,7 @@ const monsterKit = (() => {
             const hit = combatKit.sweep(r, at, u0, u1, targets.map(f => ({ id: f.id, boxes: fighterKit.hurtboxes(sim, f) })), striking(move));
             if (hit) {
                 m.struck = true; m.stopped = true;
-                combatKit.strike(sim, targets.find(f => f.id === hit.id), m, m.atk * move.ratio * (m.enraged ? S.enrage.atk : 1), hit.point, { move: m.move });
+                combatKit.strike(sim, targets.find(f => f.id === hit.id), m, m.atk * move.ratio * (m.enraged ? S.enrage.atk : 1), hit.point, { move: m.move, weight: combatKit.heft(move.ratio, Object.values(S.moves).map(o => o.ratio)) });
             }
         }
         if (m.phase === 'swing' && m.t >= move.swing - 1e-9) { m.phase = 'recover'; m.t = 0; }

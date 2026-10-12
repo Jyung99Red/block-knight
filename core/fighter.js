@@ -225,12 +225,13 @@ const fighterKit = (() => {
         for (const s of list) if (s.done && s.p.act === s.a) endSwing(sim, s.p, !judge);
     }
     function land(sim, { p, a, hit, foe }) {
-        const m = moveOf(a.move), raw = p.atk * (m.ratio + (m.chargeRatio || 0) * a.share), heavy = heavyOf(m);
+        const m = moveOf(a.move), ratio = m.ratio + (m.chargeRatio || 0) * a.share, raw = p.atk * ratio, heavy = heavyOf(m);
         // Another fighter has a shield and stun of its own (a duel): only a
         // heavy move breaks its combo (design.md 4.4), or one that breaks
         // the guard it meets.
         if (foe.kind === 'fighter') {
-            combatKit.strike(sim, foe, p, raw, hit.point, { move: a.move, heavy, stun: heavy, knockback: m.knockback, pierce: !!m.guardBreak });
+            combatKit.strike(sim, foe, p, raw, hit.point, { move: a.move, heavy, stun: heavy, knockback: m.knockback, pierce: !!m.guardBreak,
+                weight: combatKit.heft(ratio, Object.values(K().moves).filter(o => o.weapon === m.weapon).map(o => o.ratio)) });
             return;
         }
         const amount = combatKit.defended(raw, foe.def);
