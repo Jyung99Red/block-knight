@@ -235,9 +235,9 @@ const fighterKit = (() => {
                 weight: combatKit.heft(ratio, Object.values(K().moves).filter(o => o.weapon === m.weapon).map(o => o.ratio)) });
             return;
         }
-        const { amount, shielded } = combatKit.dealt(foe, p, combatKit.defended(raw, foe.def));
+        const { amount, shielded, pierced } = combatKit.dealt(foe, p, combatKit.defended(raw, foe.def), !!m.guardBreak);
         p.stats.hits++;
-        emit(sim, p, 'hit', { source: p.id, target: foe.id, move: a.move, damage: amount, heavy, at: hit.point, ...(shielded ? { shielded } : {}) });
+        emit(sim, p, 'hit', { source: p.id, target: foe.id, move: a.move, damage: amount, heavy, at: hit.point, ...(shielded ? { shielded } : {}), ...(pierced ? { pierced } : {}) });
         combatKit.kitOf(foe).struck(sim, foe, { amount, stagger: m.stagger, by: p });
         combatKit.impact(sim, foe, p, 'hit', m.knockback);
     }

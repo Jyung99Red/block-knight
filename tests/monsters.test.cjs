@@ -745,9 +745,12 @@ test('the minotaur\'s shield: a blow from within the guard\'s front arc does `sh
     // A perfect parry's counter comes from in front: the shield takes its share too.
     const counter = combatKit.defended(30 * F.damage.parryAtkRatio, MON.minotaur.def), sim = open('minotaur'), m = ready(sim, STANDARD, 0);
     assert.equal(combatKit.dealt(m, sim.player, counter).amount, Math.round(counter * MON.minotaur.shield.taken));
+    // A blow that breaks a guard (the sword's thrust) breaks the shield: whole from in front too (user, 2026-10-12).
+    assert.deepEqual(plain(combatKit.dealt(m, sim.player, 9, true)), { amount: 9, shielded: false, pierced: true });
+    assert.deepEqual(plain(combatKit.dealt(m, sim.player, 9)), { amount: Math.max(1, Math.round(9 * MON.minotaur.shield.taken)), shielded: true, pierced: false });
     // Monsters without a shield take every blow whole.
     const goblin = open('goblin').monsters[0];
-    assert.deepEqual(plain(combatKit.dealt(goblin, { x: goblin.x + Math.cos(goblin.facing) * 50, y: goblin.y + Math.sin(goblin.facing) * 50 }, 20)), { amount: 20, shielded: false });
+    assert.deepEqual(plain(combatKit.dealt(goblin, { x: goblin.x + Math.cos(goblin.facing) * 50, y: goblin.y + Math.sin(goblin.facing) * 50 }, 20, true)), { amount: 20, shielded: false, pierced: false });
 });
 
 test('the wolf\'s leap rams with its body along the path, sub-stepped, and stops where it meets the player', () => {

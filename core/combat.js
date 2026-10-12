@@ -17,10 +17,13 @@ const combatKit = (() => {
     function emit(sim, type, data = {}) { sim.events.push({ type, time: sim.time, ...data }); }
     // What a blow of `amount` (after DEF) from `from` does to `body`. A
     // kit with `taken` lets only that share through (a monster's shield,
-    // held before it for good: design.md 5); `shielded` says it did.
-    function dealt(body, from, amount) {
+    // held before it for good: design.md 5); `shielded` says it did. A
+    // blow that breaks a guard (`pierce`, the sword's thrust) breaks the
+    // shield too: it lands whole, and `pierced` says so (user, 2026-10-12).
+    function dealt(body, from, amount, pierce = false) {
         const share = kitOf(body).taken?.(body, from) ?? 1;
-        return share < 1 ? { amount: Math.max(1, Math.round(amount * share)), shielded: true } : { amount, shielded: false };
+        if (share >= 1) return { amount, shielded: false, pierced: false };
+        return pierce ? { amount, shielded: false, pierced: true } : { amount: Math.max(1, Math.round(amount * share)), shielded: true, pierced: false };
     }
 
     // Take hit points. A body marked `endless` (training) is refilled

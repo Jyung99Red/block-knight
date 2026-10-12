@@ -181,7 +181,8 @@ const monsterKit = (() => {
     // a kind with a `shield` holds it before it for good (the minotaur,
     // user 2026-10-12), and a blow from within a guard's front arc (the
     // player's own, combat.guard.frontAngle) does `shield.taken` of its
-    // damage. Behind or to the side, the whole blow.
+    // damage. Behind or to the side, the whole blow; a blow that breaks a
+    // guard breaks the shield too (combatKit.dealt).
     function taken(m, from) { const S = configOf(m.kind).shield; return S && combatKit.inFront(m, from) ? S.taken : 1; }
     function struck(sim, m, { amount, stagger: points = 0, by = null }) {
         if (!living(m)) return;
