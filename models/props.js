@@ -48,7 +48,8 @@ const propModels = Object.freeze({
         iron_ore: { size: [0.2, 0.16, 0.18], color: 'ore' },
         crystal: { size: [0.1, 0.24, 0.1], color: 'crystal' },
         herb: { size: [0.22, 0.08, 0.16], color: 'herbLight' },
-        spider_silk: { size: [0.2, 0.12, 0.2], color: 'silkItem' }
+        spider_silk: { size: [0.2, 0.12, 0.2], color: 'silkItem' },
+        minotaur_horn: { size: [0.1, 0.12, 0.32], color: 'horn' }
     },
     // Torches that stand in a map (core/props.js `lamp`), in blocks: boxes
     // ({ size, at, color }) and where the flame burns. `stand` from the

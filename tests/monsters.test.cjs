@@ -18,10 +18,10 @@ const plain = value => JSON.parse(JSON.stringify(value));
 const player = R.build(playerModel, { equipment: equipmentModels.forLoadout(gameConfig.gear.starter) });
 const still = { gait: 0, moveBlend: 0, runBlend: 0, guardBlend: 0, stun: 0 };
 const standing = kind => ({ kind, phase: 'patrol', t: 0, move: null, flinch: 0, gait: 0, moveBlend: 0 });
-const KINDS = ['goblin', 'wolf', 'spider', 'goblinChief', 'wolfKing'];
+const KINDS = ['goblin', 'wolf', 'spider', 'goblinChief', 'wolfKing', 'minotaur'];
 const rigs = Object.fromEntries(KINDS.map(k => [k, monsterKit.rig(k)]));
 // Moves drawn either way round, mirrored at random (models/: `either`).
-const either = (kind, name) => !!{ goblin: g.goblinPoses, wolf: g.wolfPoses, spider: g.spiderPoses }[monsterKit.modelOf(kind)].moves[MON[kind].moves[name].pose || name].either;
+const either = (kind, name) => !!{ goblin: g.goblinPoses, wolf: g.wolfPoses, spider: g.spiderPoses, minotaur: g.minotaurPoses }[monsterKit.modelOf(kind)].moves[MON[kind].moves[name].pose || name].either;
 
 // ---- the player's cuts on monsters (design.md 4.3) ----
 // Each move swung with a weapon of its type.
@@ -195,7 +195,7 @@ test('the windup turns to follow the player until `lock` before the swing, then 
 
 // ---- choosing what to do (design.md 5.2) ----
 // An open walled square with one monster of `kind` at home in its middle.
-const LETTER = { goblin: 'g', wolf: 'w', spider: 's', goblinChief: 'G', wolfKing: 'K' }, HOME = { x: 820, y: 620 };
+const LETTER = { goblin: 'g', wolf: 'w', spider: 's', goblinChief: 'G', wolfKing: 'K', minotaur: 'M' }, HOME = { x: 820, y: 620 };
 function open(kind, seed = 1, loadout = null) {
     const rows = Array.from({ length: 30 }, (_, r) => r === 0 || r === 29 ? '1'.repeat(40) : '1' + '.'.repeat(38) + '1');
     const mark = (r, c, ch) => { rows[r] = rows[r].slice(0, c) + ch + rows[r].slice(c + 1); };
@@ -725,6 +725,29 @@ test('a block and a perfect parry work against a monster as against the dummy', 
     assert.equal(parry.stats.parries, 1);
     const m = parry.monsters[0];
     assert.ok(m.hp < m.maxHp && m.stagger === F.stagger.parry, 'the parry hits back and staggers');
+});
+
+test('the minotaur\'s shield: a blow from within the guard\'s front arc does `shield.taken` of its damage, from the side or behind all of it (user, 2026-10-12)', () => {
+    // The player's A on a minotaur turned `turn` from facing the player, held there reeling (it would turn to face).
+    const cut = turn => {
+        const sim = open('minotaur'), m = ready(sim, STANDARD, 0);
+        Object.assign(m, { phase: 'reel', t: 0, facing: turn });
+        tap(sim); step(sim, 0.3);
+        const hit = events(sim, 'hit').find(e => e.target === m.id);
+        assert.ok(hit, `no hit turned ${turn.toFixed(2)}`);
+        assert.equal(m.maxHp - m.hp, hit.damage, 'what it shows is what it takes');
+        return hit;
+    };
+    const full = combatKit.defended((gameConfig.combat.fighters.base.atk + gameConfig.items.wooden_sword.stats.atk) * MOVES.slash.ratio, MON.minotaur.def);
+    const front = cut(0), edge = cut(F.guard.frontAngle - 0.05), side = cut(F.guard.frontAngle + 0.05), back = cut(Math.PI);
+    for (const h of [front, edge]) assert.ok(h.shielded && h.damage === Math.round(full * MON.minotaur.shield.taken), JSON.stringify(h));
+    for (const h of [side, back]) assert.ok(!h.shielded && h.damage === full, JSON.stringify(h));
+    // A perfect parry's counter comes from in front: the shield takes its share too.
+    const counter = combatKit.defended(30 * F.damage.parryAtkRatio, MON.minotaur.def), sim = open('minotaur'), m = ready(sim, STANDARD, 0);
+    assert.equal(combatKit.dealt(m, sim.player, counter).amount, Math.round(counter * MON.minotaur.shield.taken));
+    // Monsters without a shield take every blow whole.
+    const goblin = open('goblin').monsters[0];
+    assert.deepEqual(plain(combatKit.dealt(goblin, { x: goblin.x + Math.cos(goblin.facing) * 50, y: goblin.y + Math.sin(goblin.facing) * 50 }, 20)), { amount: 20, shielded: false });
 });
 
 test('the wolf\'s leap rams with its body along the path, sub-stepped, and stops where it meets the player', () => {

@@ -1,4 +1,5 @@
-// Monsters (design.md 5): the goblin, the wolf and the cave spider. Patrol
+// Monsters (design.md 5): the goblin, the wolf, the cave spider and the
+// minotaur (a boss of its own, a shield before it). Patrol
 // round home, notice a player they can see and stand alert a moment, then fight,
 // walking round any wall between (terrainKit.wayTo): free again, a
 // monster turns to the player if it must and picks what to do from the
@@ -36,10 +37,13 @@
 const monsterKit = (() => {
     const M = () => gameConfig.monsters, F = () => gameConfig.combat;
     const UNIT = () => gameConfig.world.unitsPerBlock;
-    const MODELS = { goblin: () => goblinModel, wolf: () => wolfModel, spider: () => spiderModel };
-    const POSES = { goblin: () => goblinPoses, wolf: () => wolfPoses, spider: () => spiderPoses };
+    const MODELS = { goblin: () => goblinModel, wolf: () => wolfModel, spider: () => spiderModel, minotaur: () => minotaurModel };
+    const POSES = { goblin: () => goblinPoses, wolf: () => wolfPoses, spider: () => spiderPoses, minotaur: () => minotaurPoses };
     // What a kind carries or wears: by kind, else by model.
-    const GEAR = { goblin: () => [goblinPoses.club()], wolf: () => [], spider: () => [], goblinChief: () => [goblinPoses.club(), goblinPoses.helmet()], wolfKing: () => [wolfPoses.mane()] };
+    const GEAR = {
+        goblin: () => [goblinPoses.club()], wolf: () => [], spider: () => [], goblinChief: () => [goblinPoses.club(), goblinPoses.helmet()], wolfKing: () => [wolfPoses.mane()],
+        minotaur: () => [minotaurPoses.axe(), minotaurPoses.shield()]
+    };
     // Phases in which a monster is in a fight.
     const FIGHTING = new Set(['rise', 'alert', 'chase', 'approach', 'windup', 'swing', 'recover', 'reel']);
     const emit = (sim, m, type, data) => combatKit.emit(sim, type, { side: 'monster', id: m.id, kind: m.kind, ...data });
@@ -173,6 +177,12 @@ const monsterKit = (() => {
     }
 
     // ---- being hit (combatKit.kitOf); `by` is the fighter who struck ----
+    // The share of a blow from `from` that gets through (combatKit.dealt):
+    // a kind with a `shield` holds it before it for good (the minotaur,
+    // user 2026-10-12), and a blow from within a guard's front arc (the
+    // player's own, combat.guard.frontAngle) does `shield.taken` of its
+    // damage. Behind or to the side, the whole blow.
+    function taken(m, from) { const S = configOf(m.kind).shield; return S && combatKit.inFront(m, from) ? S.taken : 1; }
     function struck(sim, m, { amount, stagger: points = 0, by = null }) {
         if (!living(m)) return;
         combatKit.damage(sim, m, amount);
@@ -419,5 +429,5 @@ const monsterKit = (() => {
         m.h = space.groundHeight(m.x, m.y);
     }
     function tick(sim, dt) { for (const m of sim.monsters) tickOne(sim, m, dt); }
-    return { FIGHTING, rig, look, create, pose, solve, hurtboxes, struck, stagger, threshold, reach, bands, cycleLength, height, tick, living, engaged, inFight, present: living, modelOf };
+    return { FIGHTING, rig, look, create, pose, solve, hurtboxes, struck, taken, stagger, threshold, reach, bands, cycleLength, height, tick, living, engaged, inFight, present: living, modelOf };
 })();

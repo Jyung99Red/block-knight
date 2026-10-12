@@ -15,6 +15,13 @@ const combatKit = (() => {
         return Math.max(1, Math.round(raw * (1 - def / (def + C().damage.defenseConstant))));
     }
     function emit(sim, type, data = {}) { sim.events.push({ type, time: sim.time, ...data }); }
+    // What a blow of `amount` (after DEF) from `from` does to `body`. A
+    // kit with `taken` lets only that share through (a monster's shield,
+    // held before it for good: design.md 5); `shielded` says it did.
+    function dealt(body, from, amount) {
+        const share = kitOf(body).taken?.(body, from) ?? 1;
+        return share < 1 ? { amount: Math.max(1, Math.round(amount * share)), shielded: true } : { amount, shielded: false };
+    }
 
     // Take hit points. A body marked `endless` (training) is refilled
     // instead of falling.
@@ -86,7 +93,7 @@ const combatKit = (() => {
             const G = guardBy(v), parry = sim.time - v.guard.readyAt <= G.parryWindow + 1e-9;
             if (!parry && pierce) pierced = true;
             else if (parry) {
-                const counter = defended(v.atk * C().damage.parryAtkRatio, attacker.def);
+                const counter = dealt(attacker, v, defended(v.atk * C().damage.parryAtkRatio, attacker.def)).amount;
                 v.stats.parries++;
                 emit(sim, 'parry', { side: v.side, target: attacker.id, damage: counter, at: point });
                 kitOf(attacker).struck(sim, attacker, { amount: counter, stagger: C().stagger.parry, by: v });
@@ -188,5 +195,5 @@ const combatKit = (() => {
         }
         return false;
     }
-    return { kitOf, defended, emit, damage, impact, tickPush, guardOf, guardCost, heft, spendGuard, tickGuardBar, strike, hurtboxes, attackBoxes, weaponBoxes, contacts, sweep, inFront, sees };
+    return { kitOf, defended, dealt, emit, damage, impact, tickPush, guardOf, guardCost, heft, spendGuard, tickGuardBar, strike, hurtboxes, attackBoxes, weaponBoxes, contacts, sweep, inFront, sees };
 })();

@@ -337,8 +337,9 @@ const hud = (() => {
                 if (!['hit', 'block', 'parry'].includes(e.type) || !e.at) continue;
                 const el = document.createElement('div');
                 const toSelf = e.type === 'hit' && e.target === selfId;
-                el.className = 'float' + (toSelf ? ' hurt' : '') + (e.type === 'parry' ? ' parry' : '') + (e.type === 'block' ? ' block' : '') + (e.heavy ? ' heavy' : '');
-                el.textContent = e.type === 'parry' ? `弹反 ${e.damage}` : e.type === 'block' ? `格挡 ${e.damage}` : String(e.damage);
+                // A blow on the shield a monster holds before it (the minotaur) reads as a block does.
+                el.className = 'float' + (toSelf ? ' hurt' : '') + (e.type === 'parry' ? ' parry' : '') + (e.type === 'block' || e.shielded ? ' block' : '') + (e.heavy ? ' heavy' : '');
+                el.textContent = e.type === 'parry' ? `弹反 ${e.damage}` : e.type === 'block' ? `格挡 ${e.damage}` : e.shielded ? `盾 ${e.damage}` : String(e.damage);
                 els.floats.appendChild(el);
                 floats.push({ el, at: e.at, born: now });
             }

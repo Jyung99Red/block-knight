@@ -25,6 +25,9 @@ const palette = Object.freeze({
     chiefSkin: '#5f8a34', chiefSkinLight: '#6f9c3e', chiefSkinDark: '#527a2c', chiefRag: '#8a2f2a', chiefRagDark: '#6a2420', chiefRagLight: '#a8473d',
     chiefClub: '#3a2a1a', helmet: '#7d8088', horn: '#e8dcc0',
     kingFur: '#4c4d55', kingFurLight: '#60616a', kingHead: '#56575f', kingMuzzle: '#7c7d85', kingDark: '#3a3b41', kingLeg: '#46474e', kingEye: '#ff7a3a', mane: '#2c2d33',
+    // the minotaur (a boss of its own)
+    minoFur: '#6e4a33', minoFurLight: '#86603f', minoFurDark: '#4f3424', minoHead: '#5f3f2b', minoMuzzle: '#b28a68', minoEye: '#ff4a2a',
+    minoBelt: '#3a2c22', minoCloth: '#7a2b26', hoof: '#2b221d', minoShield: '#7a5a38',
     // terrain
     grass: '#6aa94b', grassLight: '#8cc95e', dirt: '#8b5d3c', path: '#b4925e', pebble: '#8e8a83',
     stone: '#8e9297', stoneDark: '#5f6368', stoneLight: '#b8bcc0', moss: '#5d8a3c',

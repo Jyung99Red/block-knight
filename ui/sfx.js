@@ -89,7 +89,7 @@ const sfx = (() => {
         if (!enabled || !ctx || ctx.state !== 'running') return;
         const own = e.side === selfId;
         if (e.type === 'swing') (own ? sounds.swing(e.heavy) : sounds.enemySwing());
-        else if (e.type === 'hit') (e.target === selfId ? sounds.hurt : sounds.hit)();
+        else if (e.type === 'hit') { (e.target === selfId ? sounds.hurt : sounds.hit)(); if (e.shielded) sounds.block(); }
         else if (e.type === 'block') sounds.block();
         else if (e.type === 'parry') sounds.parry();
         else if (e.type === 'guard_broken' && own) sounds.guardBroken();

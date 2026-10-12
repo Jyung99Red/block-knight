@@ -316,6 +316,25 @@ const gameConfig = (() => {
                 },
                 near: { bite: 1, quickBite: 1 },
                 mid: { leap: 1, approach: 2 }
+            },
+            // The minotaur (石迷宫; user, 2026-10-12): a boss of its own
+            // skeleton, its shield held before it for good. shield: a blow
+            // from within the guard's front arc (the player's own,
+            // combat.guard.frontAngle) does `taken` of its damage (half:
+            // user); from the side or behind, all of it.
+            minotaur: {
+                name: '牛头人', scale: 1.35, boss: true, loot: 'minotaur', stagger: 10, revive: { goblin_ear: 4, wolf_pelt: 4 },
+                shield: { taken: 0.5 },
+                maxHp: 450, atk: 64, def: 5, radius: 22, speed: 50, turnRate: 2.4, trackTurn: 1.3,
+                patrolRadius: 0, patrolSpeed: 16, patrolRest: 2, alertRange: 200, alertSeconds: 0.8, leash: 380, standOff: 0.85,
+                firstDelay: 0.5, delay: 0.6, flinchSeconds: 0.18, enrage: { threshold: 0.5, atk: 1.25, tempo: 1.2 },
+                moves: {
+                    sweep: { name: '横扫', windup: 0.85, lock: 0.3, swing: 0.22, recovery: 1.3, ratio: 0.7, step: 10 },
+                    chop: { name: '劈斧', windup: 1.2, lock: 0.35, swing: 0.2, recovery: 2.2, ratio: 1.0, step: 20, cooldown: 3 },
+                    charge: { name: '冲撞', windup: 1.3, lock: 0.4, swing: 0.6, recovery: 2.4, ratio: 0.9, step: 170, ram: true, cooldown: 6 }
+                },
+                near: { sweep: 3, chop: 2 },
+                mid: { charge: 1, approach: 2 }
             }
         },
 
@@ -340,6 +359,7 @@ const gameConfig = (() => {
             wolf_pelt: { kind: 'material', name: '狼皮', icon: '🐺', sell: 6, desc: '野狼掉的。铁匠铺打造要用，商店也收。' },
             chief_tusk: { kind: 'material', name: '头目獠牙', icon: '🦷', sell: 30, desc: '哥布林头目的獠牙。能打成护符。' },
             king_fang: { kind: 'material', name: '狼王之牙', icon: '🦴', sell: 40, desc: '狼王的牙。能打成项链。' },
+            minotaur_horn: { kind: 'material', name: '牛头人之角', icon: '🐂', sell: 50, desc: '石迷宫里牛头人的角。商店收。' },
             iron_ore: { kind: 'material', name: '铁矿石', icon: '🪨', sell: 3, desc: '原野和山谷的铁矿石块里采来的。铁匠铺打造铁器要用。' },
             crystal: { kind: 'material', name: '晶石', icon: '💎', sell: 10, desc: '千柱窟里采来的晶石。能镶在饰品上。' },
             spider_silk: { kind: 'material', name: '蛛丝', icon: '🕸️', sell: 5, desc: '千柱窟的洞穴蜘蛛掉的。商店收。' },
@@ -365,14 +385,16 @@ const gameConfig = (() => {
             spider: [{ item: 'gold', chance: 1, amount: [2, 4] }, { item: 'spider_silk', chance: 0.85, amount: [1, 2] }],
             goblinChief: [{ item: 'gold', chance: 1, amount: [20, 30] }, { item: 'chief_tusk', chance: 1, amount: [1, 1] }],
             wolfKing: [{ item: 'gold', chance: 1, amount: [25, 35] }, { item: 'king_fang', chance: 1, amount: [1, 1] }],
+            minotaur: [{ item: 'gold', chance: 1, amount: [30, 40] }, { item: 'minotaur_horn', chance: 1, amount: [1, 1] }],
             chiefChest: [{ item: 'gold', chance: 1, amount: [40, 60] }, { item: 'goblin_ear', chance: 1, amount: [2, 4] }, { item: 'wolf_pelt', chance: 1, amount: [1, 2] }],
             kingChest: [{ item: 'gold', chance: 1, amount: [60, 90] }, { item: 'wolf_pelt', chance: 1, amount: [3, 5] }],
             caveChest: [{ item: 'gold', chance: 1, amount: [50, 80] }, { item: 'crystal', chance: 1, amount: [2, 3] }, { item: 'wolf_pelt', chance: 1, amount: [2, 3] }],
+            mazeChest: [{ item: 'gold', chance: 1, amount: [70, 100] }, { item: 'iron_ore', chance: 1, amount: [3, 5] }, { item: 'wolf_pelt', chance: 1, amount: [2, 3] }],
             // The cheat chest in the village (user, 2026-10-06): gold, and
             // 20 of every material (user, 2026-10-08).
             cheatChest: [
                 { item: 'gold', chance: 1, amount: [500, 500] },
-                ...['iron_ore', 'wolf_pelt', 'goblin_ear', 'herb', 'crystal', 'spider_silk', 'chief_tusk', 'king_fang'].map(item => ({ item, chance: 1, amount: [20, 20] }))
+                ...['iron_ore', 'wolf_pelt', 'goblin_ear', 'herb', 'crystal', 'spider_silk', 'chief_tusk', 'king_fang', 'minotaur_horn'].map(item => ({ item, chance: 1, amount: [20, 20] }))
             ],
             ironOre: [{ item: 'iron_ore', chance: 1, amount: [1, 2] }],
             crystal: [{ item: 'crystal', chance: 1, amount: [1, 1] }],
@@ -871,8 +893,8 @@ const gameConfig = (() => {
             // two blocks wide down it with two fords, the road up its west bank from
             // the field's gate to the cave's, and across the brook the wolf
             // pack and the wolf king's den of rock in the north-east. The
-            // east road ends where the ridge has come down: a way on, some
-            // day.
+            // east road ends at the gate to the maze, open once the wolf
+            // king is down (user, 2026-10-12: a new map).
             valley: {
                 name: '灰岩谷', floor: ';',
                 rows: [
@@ -894,9 +916,9 @@ const gameConfig = (() => {
                     '5321;;;;;;::;;;;..~~...1;;;;;;;;;;;;;;;;;:::;;;;;;;;1234',
                     '43212O;1;;::;;;;...~~..;;;;;;;;;;;;;;;;;:::;;;;;;;;;1234',
                     '54421;;;;;;::;;;;..~~...;;;;;;;;;;;;;;;:::;;;O;1;;;;1334',
-                    '54431;;;;;;::;;;;...~~..;;;;;;;;;;;;h;:::;;;;;;;;;;;1235',
-                    '5321;;;;;;;:::::::::::::::::::::::::::::::::::::;1123456',
-                    '4421;;;;;;;:::::::::::::::::::::::::::::::::::::12123556',
+                    '54431;;;;;;::;;;;...~~..;;;;;;;;;;;;h;:::;;;;;;;;;;;#345',
+                    '5321;;;;;;;:::::::::::::::::::::::::::::::::::::::::P456',
+                    '4421;;;;;;;:::::::::::::::::::::::::::::::::::::::::#556',
                     '4421;;;;;;;;::;;;;;..~~..;;;;;;;;;;;;;;;;;;;;;;;;;;;1244',
                     '4421;;;;;;;;::;;;;;..~~...;;;;;;;;;;;;;;;;;;;;;;;;;;1235',
                     '5421;;w;;;;;::;;;;;...~~..;21;;;;;;;w;;;;;;;;2;;;;;;1244',
@@ -917,7 +939,8 @@ const gameConfig = (() => {
                 ],
                 portals: [
                     { at: [10, 34], to: 'field', facing: 'north' },
-                    { at: [9, 3], to: 'cave', facing: 'south' }
+                    { at: [9, 3], to: 'cave', facing: 'south' },
+                    { at: [52, 19], to: 'maze', facing: 'west', requires: 'wolfKing' }
                 ],
                 chests: [{ at: [49, 5], loot: 'kingChest', requires: 'wolfKing' }]
             },
@@ -974,6 +997,47 @@ const gameConfig = (() => {
                 ],
                 portals: [{ at: [12, 36], to: 'valley', facing: 'north' }],
                 chests: [{ at: [46, 6], loot: 'caveChest' }]
+            },
+            // A maze of ruined walls east of the valley (a first draft:
+            // user, 2026-10-12, a new map with a new boss): 7 x 5 cells
+            // three blocks wide between walls two high, a few ways round;
+            // the gate from the valley in the west wall, and in the east
+            // the minotaur's walled yard, four pillars to break its charge
+            // on and its chest behind it. Goblins and two wolves in the maze.
+            maze: {
+                name: '石迷宫',
+                rows: [
+                    '666666666666666666666666666666666666666666666666',
+                    '666666666666666666666666666666666666666666666666',
+                    '556555565555655556555565555655556666666666666666',
+                    '544444444444444444444444444444445666666666666666',
+                    '543333333333333333333333333333345666666666666666',
+                    '643...............2..........O245556555565555656',
+                    '543.........g.....2...........244444444444444466',
+                    '543..............h2.....g.....233333333333333456',
+                    '543...222222222...2...22222...2.............3456',
+                    '543...2.......2.......2.......2.............3456',
+                    '643...2.......2.......2.......2.............3456',
+                    '543...2.......2.......2.......2...2.....2...3466',
+                    '543...2...2...222222222...22222.............3456',
+                    '54#.......2...........2.....................3456',
+                    '54P..@....2.....g.....2...............M...C.3456',
+                    '64#.......2...........2.....................3456',
+                    '543...2222222222222...22222...2.............3466',
+                    '543...........2..........h2...2...2.....2...3456',
+                    '543...........2...........2.g.2.............3456',
+                    '543....O......2...........2...2.............3456',
+                    '643...22222...222222222...2...2.............3456',
+                    '543.......2...................233333333333333466',
+                    '543.....g.2........w.....w....244444444444444456',
+                    '543h......2...................245655556555565556',
+                    '543333333333333333333333333333345666666666666666',
+                    '644444444444444444444444444444445666666666666666',
+                    '565555655556555565555655556555565666666666666666',
+                    '666666666666666666666666666666666666666666666666'
+                ],
+                portals: [{ at: [2, 14], to: 'valley', facing: 'east' }],
+                chests: [{ at: [42, 14], loot: 'mazeChest', requires: 'minotaur', facing: 'west' }]
             },
             clearing: {
                 name: '训练场', training: true,

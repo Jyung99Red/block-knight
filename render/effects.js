@@ -109,7 +109,8 @@ const renderEffects = (() => {
         // A monster's colours (models/palette.js), for the burst as it falls.
         const FALLEN = Object.fromEntries(Object.entries({
             goblin: ['goblin', 'goblinLight', 'rag'], wolf: ['wolf', 'wolfLight', 'wolfDark'], spider: ['spider', 'spiderLight', 'spiderMark'],
-            goblinChief: ['chiefSkin', 'chiefRag', 'helmet', 'gold'], wolfKing: ['kingFur', 'mane', 'kingEye', 'gold']
+            goblinChief: ['chiefSkin', 'chiefRag', 'helmet', 'gold'], wolfKing: ['kingFur', 'mane', 'kingEye', 'gold'],
+            minotaur: ['minoFur', 'minoHead', 'horn', 'gold']
         }).map(([kind, names]) => [kind, names.map(name => palette[name])]));
         let shake = 0, cue = 0, rested = 0;
         function onEvents(events, selfId = 'player') {
@@ -119,6 +120,8 @@ const renderEffects = (() => {
                     if (e.heavy) shake = Math.max(shake, 0.1);
                 } else if (e.type === 'hit') {
                     flash.set(e.target, 0.12);
+                    // On the shield a monster holds before it (the minotaur): iron sparks as well.
+                    if (e.shielded) burst(e.at, 5, ['#d9dee3', '#9aa2aa'], 1.2, 2.2, 0.05);
                     if (e.heavy) { burst(e.at, 12, ['#ffffff', '#ffd27a', '#f2b544'], 2, 3.8, 0.08); if (e.source === selfId) shake = Math.max(shake, 0.12); }
                     else burst(e.at, 7, ['#ffffff', '#f4f1e6', '#d9dee3'], 1.5, 2.8, 0.06);
                 } else if (e.type === 'block') burst(e.at, 5, ['#d9dee3', '#9aa2aa'], 1.2, 2.2, 0.05);

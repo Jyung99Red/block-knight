@@ -33,7 +33,7 @@ const terrainKit = (() => {
     const RESOURCE = new Set([KIND.ore, KIND.crystal, KIND.herb]);
     const TREE_HEIGHT = 4, HOUSE_HEIGHT = 3, PORTAL_HEIGHT = 3, BRUSH_HEIGHT = 2;
     // Map letters that put a monster's home on a grass block.
-    const MONSTERS = Object.freeze({ g: 'goblin', w: 'wolf', s: 'spider', G: 'goblinChief', K: 'wolfKing' });
+    const MONSTERS = Object.freeze({ g: 'goblin', w: 'wolf', s: 'spider', G: 'goblinChief', K: 'wolfKing', M: 'minotaur' });
     // Map letters that put a lamp on a ground block (core/props.js): a
     // torch on a stand, and one on the wall beside the block.
     const LAMPS = Object.freeze({ i: 'stand', '!': 'wall' });

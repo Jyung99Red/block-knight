@@ -606,7 +606,8 @@ test('a boss called back is back at once: a region left while its grave glows ha
 });
 
 test('a monster that gives up the chase and gets home is whole again', () => {
-    const sim = W.create({ region: 'field' }), m = sim.monsters.find(x => x.kind === 'wolf');
+    // A boss, as only a boss enrages (user, 2026-10-12).
+    const sim = W.create({ region: 'field' }), m = sim.monsters.find(x => x.kind === 'goblinChief');
     sim.monsters = [m];
     put(sim.player, 2 * U, 2 * U);
     m.hp = 10; m.enraged = true; m.phase = 'return'; m.x = m.home.x + 30;
