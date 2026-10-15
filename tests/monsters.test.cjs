@@ -74,8 +74,9 @@ test('each monster move reaches as far as its key poses carry it, in front only,
         const r = monsterKit.reach(kind, i);
         assert.ok(r.forward > 40 && r.forward < 260, `${kind} ${i} reach ${r.forward}`);
         // Where the AI attacks from, and closer, the blow lands on a player in
-        // front, either way round for a move drawn both ways.
-        for (const d of [30, MON[kind].standOff * r.forward, r.forward]) for (const flip of either(kind, i) ? [false, true] : [false]) {
+        // front, either way round for a move drawn both ways. Closest is
+        // body to body: nobody stands nearer than the two radii.
+        for (const d of [MON[kind].radius + gameConfig.player.radius, MON[kind].standOff * r.forward, r.forward]) for (const flip of either(kind, i) ? [false, true] : [false]) {
             const hit = blow(kind, i, d, 0, flip);
             assert.ok(hit, `${kind} ${i} misses at ${d.toFixed(0)}`);
             // The warning, in the monster's frame (+z ahead): the contact is inside it.

@@ -6,14 +6,16 @@ const fs = require('node:fs'), path = require('node:path'), vm = require('node:v
 const root = path.join(__dirname, '..');
 const read = file => fs.readFileSync(path.join(root, file), 'utf8');
 const manifest = () => JSON.parse(read('client-assets.json'));
+// An entry's scripts with each `@name` replaced by the manifest's `groups.name`.
+const scriptsOf = (list, entry) => list[entry].scripts.flatMap(f => f[0] === '@' ? list.groups[f.slice(1)] : [f]);
 
 function load({ entry = 'game', include = file => !/^(render|ui|net|vendor)\//.test(file), globals = {} } = {}) {
     const context = vm.createContext({ console, Math, ...globals });
-    const files = manifest()[entry].scripts.filter(include);
+    const files = scriptsOf(manifest(), entry).filter(include);
     for (const file of files) vm.runInContext(read(file), context, { filename: file });
     const names = vm.runInContext('Object.keys(globalThis)', context);
     // Top-level `const` bindings are not context properties; read them by name.
     const pick = name => vm.runInContext(`typeof ${name} === 'undefined' ? undefined : ${name}`, context);
     return new Proxy({ context, files, names }, { get: (target, key) => key in target ? target[key] : pick(key) });
 }
-module.exports = { load, read, root, manifest };
+module.exports = { load, read, root, manifest, scriptsOf };

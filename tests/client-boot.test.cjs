@@ -2,6 +2,7 @@ const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs'), vm = require('node:vm'), path = require('node:path');
 const source = name => fs.readFileSync(path.join(__dirname, '..', name), 'utf8');
+const { scriptsOf } = require('./load.cjs');
 
 // node:vm cannot run a real dynamic import() without an experimental flag,
 // so the boot source is run with import( renamed to a stub the test owns.
@@ -122,7 +123,7 @@ test('the map preview\'s page (entry "map") lists no module and starts its own a
 const PAGES = { game: 'index.html', tune: 'tune.html', map: 'map.html' };
 test('the manifest and the pages agree on every partial, module, script and stylesheet', () => {
     const manifest = JSON.parse(source('client-assets.json'));
-    assert.deepEqual(Object.keys(manifest).sort(), Object.keys(PAGES).sort());
+    assert.deepEqual(Object.keys(manifest).filter(k => k !== 'groups').sort(), Object.keys(PAGES).sort());
     for (const [entry, file] of Object.entries(PAGES)) {
         const assets = manifest[entry], page = source(file);
         assert.match(page, new RegExp(`data-entry="${entry}"`), `${file} boots the "${entry}" entry`);
@@ -132,23 +133,24 @@ test('the manifest and the pages agree on every partial, module, script and styl
         }
         for (const [, id] of page.matchAll(/id="mount-([^"]+)"/g))
             assert.ok(assets.partials.includes(id), `${file} mounts "${id}", which the manifest does not list`);
-        for (const f of [...assets.styles, ...assets.scripts, ...Object.values(assets.modules || {})])
+        for (const f of [...assets.styles, ...scriptsOf(manifest, entry), ...Object.values(assets.modules || {})])
             assert.ok(fs.existsSync(path.join(__dirname, '..', f)), `${f} is listed but missing`);
     }
     assert.match(source('index.html'), /viewport-fit=cover/, 'the page must reach under notches so safe-area insets apply');
 });
 test('every script is listed once per page and on some page; core/, models/, the tuner\'s workbench and the map preview\'s plan stay free of the DOM and three.js', () => {
     const manifest = JSON.parse(source('client-assets.json')), listed = new Set();
-    for (const assets of Object.values(manifest)) {
-        assert.equal(new Set(assets.scripts).size, assets.scripts.length);
-        assets.scripts.forEach(f => listed.add(f));
+    for (const entry of Object.keys(PAGES)) {
+        const scripts = scriptsOf(manifest, entry);
+        assert.equal(new Set(scripts).size, scripts.length);
+        scripts.forEach(f => listed.add(f));
     }
     const onDisk = ['core', 'models', 'render', 'ui', 'tune', 'mapview'].flatMap(dir => fs.readdirSync(path.join(__dirname, '..', dir)).filter(f => f.endsWith('.js')).map(f => `${dir}/${f}`));
     for (const file of onDisk) if (file !== 'core/client_boot.js') assert.ok(listed.has(file), `${file} is not in client-assets.json`);
     // The game itself never loads the tuner or the map preview; the map
     // preview draws in 2D: no three.js, nothing of the game's own pages.
-    assert.ok(!manifest.game.scripts.some(f => /^(tune|mapview)\//.test(f)));
-    assert.ok(!manifest.map.modules && !manifest.map.scripts.some(f => /^(render|ui|net|vendor|tune)\//.test(f)));
+    assert.ok(!scriptsOf(manifest, 'game').some(f => /^(tune|mapview)\//.test(f)));
+    assert.ok(!manifest.map.modules && !scriptsOf(manifest, 'map').some(f => /^(render|ui|net|vendor|tune)\//.test(f)));
     for (const file of [...listed].filter(f => /^(core|models)\//.test(f) || f === 'tune/lab.js' || f === 'mapview/plan.js'))
         assert.doesNotMatch(source(file), /\b(document|window|THREE)\s*[.[]/, `${file} must run in Node and on a PVP host`);
 });

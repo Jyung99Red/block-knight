@@ -80,14 +80,16 @@ const clientBoot = (() => {
         root.dataset.clientState = 'loading';
         loadingPanel().textContent = '正在加载游戏…';
         try {
-            const assets = JSON.parse(await read('client-assets.json'))[entry];
+            const manifest = JSON.parse(await read('client-assets.json')), assets = manifest[entry];
             const modules = Object.entries(assets?.modules || {});
-            if (!assets || !Array.isArray(assets.styles) || !assets.styles.length || !Array.isArray(assets.scripts) ||
-                ![...assets.styles, ...assets.scripts, ...modules.map(([, path]) => path)].every(isLocal) ||
+            // A script listed as `@name` stands for the manifest's `groups.name` (files several pages share).
+            const scripts = Array.isArray(assets?.scripts) ? assets.scripts.flatMap(path => typeof path === 'string' && path[0] === '@' ? manifest.groups?.[path.slice(1)] || [null] : [path]) : null;
+            if (!assets || !Array.isArray(assets.styles) || !assets.styles.length || !scripts ||
+                ![...assets.styles, ...scripts, ...modules.map(([, path]) => path)].every(isLocal) ||
                 !modules.every(([name]) => /^[A-Za-z_$][\w$]*$/.test(name))) {
                 throw new Error('本地资源清单无效');
             }
-            const paths = [...assets.styles, ...assets.scripts, ...(assets.partials || []).map(id => `partials/${id}.html`)];
+            const paths = [...assets.styles, ...scripts, ...(assets.partials || []).map(id => `partials/${id}.html`)];
             const [sources] = await Promise.all([
                 Promise.all(paths.map(async path => [path, await read(path)])).then(list => new Map(list)),
                 Promise.all(modules.map(async ([name, path]) => {
@@ -100,7 +102,7 @@ const clientBoot = (() => {
                 if (!mount) throw new Error(`页面容器缺失：${id}`);
                 mount.outerHTML = sources.get(`partials/${id}.html`);
             }
-            for (const path of assets.scripts) {
+            for (const path of scripts) {
                 const script = document.createElement('script');
                 let failure;
                 const onError = event => { failure = event.error || new Error(event.message); };

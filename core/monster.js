@@ -37,13 +37,17 @@
 const monsterKit = (() => {
     const M = () => gameConfig.monsters, F = () => gameConfig.combat;
     const UNIT = () => gameConfig.world.unitsPerBlock;
-    const MODELS = { goblin: () => goblinModel, wolf: () => wolfModel, spider: () => spiderModel, minotaur: () => minotaurModel };
-    const POSES = { goblin: () => goblinPoses, wolf: () => wolfPoses, spider: () => spiderPoses, minotaur: () => minotaurPoses };
+    // The skeletons (models/): each one's boxes and its key poses. A new
+    // skeleton is one line here.
+    const SKELETONS = {
+        goblin: () => ({ model: goblinModel, poses: goblinPoses }), wolf: () => ({ model: wolfModel, poses: wolfPoses }),
+        spider: () => ({ model: spiderModel, poses: spiderPoses }), minotaur: () => ({ model: minotaurModel, poses: minotaurPoses })
+    };
     // What a kind carries or wears: its `gear` (gameConfig.monsters), else
     // its model's, each a name in the model's poses.
     const gearOf = kind => {
         const model = modelOf(kind), names = configOf(kind).gear || configOf(model).gear || [];
-        return names.map(name => POSES[model]()[name]());
+        return names.map(name => SKELETONS[model]().poses[name]());
     };
     // Phases in which a monster is in a fight.
     const FIGHTING = new Set(['rise', 'alert', 'chase', 'approach', 'windup', 'swing', 'recover', 'reel']);
@@ -55,11 +59,11 @@ const monsterKit = (() => {
     const approach = (value, target, rate) => target > value ? Math.min(target, value + rate) : Math.max(target, value - rate);
     const configOf = kind => {
         const S = M()[kind];
-        if (!S || !MODELS[S.model || kind]) throw new Error(`Unknown monster ${kind}`);
+        if (!S || !SKELETONS[S.model || kind]) throw new Error(`Unknown monster ${kind}`);
         return S;
     };
     const modelOf = kind => configOf(kind).model || kind;
-    const posesOf = kind => POSES[modelOf(kind)]();
+    const posesOf = kind => SKELETONS[modelOf(kind)]().poses;
     const distance = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
     const living = m => m.phase !== 'dead';
     const engaged = m => FIGHTING.has(m.phase);
@@ -68,9 +72,9 @@ const monsterKit = (() => {
     // Distance walked by the monster being ticked, for its gait.
     let walked = 0;
 
-    function rig(kind) { const S = configOf(kind), model = modelOf(kind); return rigKit.build(MODELS[model](), { scale: S.scale || 1, equipment: gearOf(kind) }); }
+    function rig(kind) { const S = configOf(kind), model = modelOf(kind); return rigKit.build(SKELETONS[model]().model, { scale: S.scale || 1, equipment: gearOf(kind) }); }
     // The colours a kind swaps (models/: a model's `looks`).
-    function look(kind) { const S = configOf(kind); return S.look ? MODELS[modelOf(kind)]().looks[S.look] : {}; }
+    function look(kind) { const S = configOf(kind); return S.look ? SKELETONS[modelOf(kind)]().model.looks[S.look] : {}; }
     function create(terrain, spawn, index) {
         const S = configOf(spawn.kind), at = terrainKit.cellCentre(terrain, spawn.col, spawn.row);
         return {

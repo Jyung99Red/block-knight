@@ -241,7 +241,7 @@
 - 改动直接提交并推送到 `main`，不另开分支（用户）。
 - **不擅自加功能**（用户）：用户没提的功能、已定规则的改动，先问再做。
 - 可调数值只放 `game_config.js`，改了同步 `docs/parameters.md`。模型形状和关键姿势是 `models/` 里的数据，不是可调数值。
-- 新脚本登记到 `client-assets.json`；新页面片段还要在它那一页（`index.html`、`tune.html` 或 `map.html`）里加 `#mount-<id>`。
+- 新脚本登记到 `client-assets.json`（`models/` 下的文件游戏页和调校页共用，只登记在 `groups.models` 里）；新页面片段还要在它那一页（`index.html`、`tune.html` 或 `map.html`）里加 `#mount-<id>`。
 - **测试看着办**（用户 2026-10-08）：只有改动可能弄坏的逻辑，才跑它对应的测试（`node --test tests/<文件>.test.cjs`）；画面和调出来的数由用户在手机上看。
 - 代码注释和 `AGENTS.md` 用英文；`README.md`、界面文字、`docs/` 用中文。
 - `docs/parameters.md` 是数值对照表；`docs/tasks/` 只有 3 份（这份、`design.md`、`ideas.md`），都要短，只写现在：`design.md` 写游戏是什么和定下来的规则，`ideas.md` 写聊过还没定的方向，

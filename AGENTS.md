@@ -93,7 +93,8 @@ This file only changes when project setup changes.
   `playwright-core` anywhere and set `PLAYWRIGHT_MODULE` to it and
   `PLAYWRIGHT_CHANNEL=chrome`.
 - New script or partial: register it in `client-assets.json` under its
-  page's entry; a partial also needs `#mount-<id>` in that page
+  page's entry (the `models/` files, which the game and the tuner share,
+  once in `groups.models`, which both entries list as `@models`); a partial also needs `#mount-<id>` in that page
   (`index.html`, `tune.html` or `map.html`).
 - Code comments and `AGENTS.md` in English; `README.md`, UI text and
   `docs/` in Chinese.

@@ -1,4 +1,19 @@
 {
+  "groups": {
+    "models": [
+      "models/palette.js",
+      "models/player.js",
+      "models/equipment.js",
+      "models/player_poses.js",
+      "models/player_moves.js",
+      "models/dummy.js",
+      "models/goblin.js",
+      "models/wolf.js",
+      "models/spider.js",
+      "models/minotaur.js",
+      "models/props.js"
+    ]
+  },
   "game": {
     "modules": {
       "THREE": "vendor/three/three.module.min.js"
@@ -11,17 +26,7 @@
       "core/math3d.js",
       "core/space.js",
       "core/rig.js",
-      "models/palette.js",
-      "models/player.js",
-      "models/equipment.js",
-      "models/player_poses.js",
-      "models/player_moves.js",
-      "models/dummy.js",
-      "models/goblin.js",
-      "models/wolf.js",
-      "models/spider.js",
-      "models/minotaur.js",
-      "models/props.js",
+      "@models",
       "core/player_anim.js",
       "core/inventory.js",
       "core/terrain.js",
@@ -81,17 +86,7 @@
       "core/math3d.js",
       "core/space.js",
       "core/rig.js",
-      "models/palette.js",
-      "models/player.js",
-      "models/equipment.js",
-      "models/player_poses.js",
-      "models/player_moves.js",
-      "models/dummy.js",
-      "models/goblin.js",
-      "models/wolf.js",
-      "models/spider.js",
-      "models/minotaur.js",
-      "models/props.js",
+      "@models",
       "core/player_anim.js",
       "core/inventory.js",
       "core/terrain.js",
