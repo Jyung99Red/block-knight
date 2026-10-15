@@ -247,6 +247,11 @@ const gameConfig = (() => {
         // once (windup to recovery; user, 2026-10-03: two wolves); the
         // others wait their turn, packStandOff of their near band's edge
         // from the player. No `pack`: no limit.
+        // Every kind names its `letter` on a map's rows (core/terrain.js)
+        // and the `gear` it carries or wears: the names of its model's
+        // pose sets' items (models/), else its model's own kind's gear.
+        // A new kind is only its entry here, its `look` (or skeleton)
+        // and a palette colour or two; nothing else lists the kinds.
         // Bosses (design.md 5): `model` is the skeleton they are
         // built on, `scale` how much bigger, `look` their colours
         // (models/); a boss down stays down and opens what waits on it.
@@ -257,7 +262,7 @@ const gameConfig = (() => {
         monsters: {
             corpseSeconds: 2.5, riseSeconds: 1.2, approachSeconds: 0.8, turnFirst: Math.PI / 4, reactSeconds: 0.35, packStandOff: 1.5, returnHeal: 0.3,
             goblin: {
-                name: '哥布林', loot: 'goblin', maxHp: 105, atk: 26, def: 3, radius: 12, speed: 54, turnRate: 3, trackTurn: 1.6,
+                name: '哥布林', letter: 'g', gear: ['club'], loot: 'goblin', maxHp: 105, atk: 26, def: 3, radius: 12, speed: 54, turnRate: 3, trackTurn: 1.6,
                 patrolRadius: 60, patrolSpeed: 16, patrolRest: 1.4, alertRange: 150, alertSeconds: 0.5, leash: 260, standOff: 0.85,
                 firstDelay: 0.3, delay: 0.45, flinchSeconds: 0.22,
                 moves: {
@@ -268,7 +273,7 @@ const gameConfig = (() => {
                 mid: { pounce: 1, approach: 2 }
             },
             wolf: {
-                name: '野狼', loot: 'wolf', maxHp: 90, atk: 34, def: 2, radius: 16, speed: 78, turnRate: 3, trackTurn: 1.6,
+                name: '野狼', letter: 'w', loot: 'wolf', maxHp: 90, atk: 34, def: 2, radius: 16, speed: 78, turnRate: 3, trackTurn: 1.6,
                 patrolRadius: 80, patrolSpeed: 22, patrolRest: 1.0, alertRange: 180, alertSeconds: 0.4, leash: 300, standOff: 0.85, pack: 2,
                 firstDelay: 0.3, delay: 0.45, flinchSeconds: 0.22,
                 moves: {
@@ -280,7 +285,7 @@ const gameConfig = (() => {
             },
             // The cave spider (千柱窟): low and quick on its legs, little HP.
             spider: {
-                name: '洞穴蜘蛛', loot: 'spider', maxHp: 80, atk: 42, def: 2, radius: 16, speed: 70, turnRate: 3.4, trackTurn: 1.8,
+                name: '洞穴蜘蛛', letter: 's', loot: 'spider', maxHp: 80, atk: 42, def: 2, radius: 16, speed: 70, turnRate: 3.4, trackTurn: 1.8,
                 patrolRadius: 60, patrolSpeed: 20, patrolRest: 1.6, alertRange: 150, alertSeconds: 0.4, leash: 280, standOff: 0.85,
                 firstDelay: 0.3, delay: 0.45, flinchSeconds: 0.22,
                 moves: {
@@ -291,7 +296,7 @@ const gameConfig = (() => {
                 mid: { spring: 1, approach: 2 }
             },
             goblinChief: {
-                name: '哥布林头目', model: 'goblin', scale: 1.45, look: 'chief', boss: true, loot: 'goblinChief', stagger: 10, revive: { goblin_ear: 2, goblin_fang: 2, goblin_bone: 2 },
+                name: '哥布林头目', letter: 'G', gear: ['club', 'helmet'], model: 'goblin', scale: 1.45, look: 'chief', boss: true, loot: 'goblinChief', stagger: 10, revive: { goblin_ear: 2, goblin_fang: 2, goblin_bone: 2 },
                 maxHp: 450, atk: 51, def: 5, radius: 18, speed: 50, turnRate: 2.6, trackTurn: 1.4,
                 patrolRadius: 0, patrolSpeed: 16, patrolRest: 2, alertRange: 190, alertSeconds: 0.7, leash: 360, standOff: 0.85,
                 firstDelay: 0.5, delay: 0.6, flinchSeconds: 0.18, enrage: { threshold: 0.5, atk: 1.25, tempo: 1.2 },
@@ -304,7 +309,7 @@ const gameConfig = (() => {
                 mid: { pounce: 1, approach: 2 }
             },
             wolfKing: {
-                name: '狼王', model: 'wolf', scale: 1.4, look: 'king', boss: true, loot: 'wolfKing', stagger: 10, revive: { wolf_fang: 2, wolf_pelt: 2, wolf_claw: 2 },
+                name: '狼王', letter: 'K', gear: ['mane'], model: 'wolf', scale: 1.4, look: 'king', boss: true, loot: 'wolfKing', stagger: 10, revive: { wolf_fang: 2, wolf_pelt: 2, wolf_claw: 2 },
                 maxHp: 420, atk: 65, def: 4, radius: 22, speed: 88, turnRate: 3, trackTurn: 1.8,
                 patrolRadius: 0, patrolSpeed: 22, patrolRest: 2, alertRange: 210, alertSeconds: 0.6, leash: 380, standOff: 0.85,
                 firstDelay: 0.4, delay: 0.5, flinchSeconds: 0.18, enrage: { threshold: 0.5, atk: 1.25, tempo: 1.25 },
@@ -324,7 +329,7 @@ const gameConfig = (() => {
             // user, 9 lands as 3; it was half); from the side or behind,
             // all of it. Bigger than first drawn, and harder (user).
             minotaur: {
-                name: '牛头人', scale: 1.6, boss: true, loot: 'minotaur', stagger: 10, revive: { goblin_ear: 2, goblin_fang: 1, goblin_bone: 1, wolf_fang: 1, wolf_pelt: 2, wolf_claw: 1 },
+                name: '牛头人', letter: 'M', gear: ['axe', 'shield'], scale: 1.6, boss: true, loot: 'minotaur', stagger: 10, revive: { goblin_ear: 2, goblin_fang: 1, goblin_bone: 1, wolf_fang: 1, wolf_pelt: 2, wolf_claw: 1 },
                 shield: { taken: 1 / 3 },
                 maxHp: 450, atk: 75, def: 5, radius: 26, speed: 50, turnRate: 2.4, trackTurn: 1.3,
                 patrolRadius: 0, patrolSpeed: 16, patrolRest: 2, alertRange: 200, alertSeconds: 0.8, leash: 380, standOff: 0.85,

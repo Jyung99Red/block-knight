@@ -39,10 +39,11 @@ const monsterKit = (() => {
     const UNIT = () => gameConfig.world.unitsPerBlock;
     const MODELS = { goblin: () => goblinModel, wolf: () => wolfModel, spider: () => spiderModel, minotaur: () => minotaurModel };
     const POSES = { goblin: () => goblinPoses, wolf: () => wolfPoses, spider: () => spiderPoses, minotaur: () => minotaurPoses };
-    // What a kind carries or wears: by kind, else by model.
-    const GEAR = {
-        goblin: () => [goblinPoses.club()], wolf: () => [], spider: () => [], goblinChief: () => [goblinPoses.club(), goblinPoses.helmet()], wolfKing: () => [wolfPoses.mane()],
-        minotaur: () => [minotaurPoses.axe(), minotaurPoses.shield()]
+    // What a kind carries or wears: its `gear` (gameConfig.monsters), else
+    // its model's, each a name in the model's poses.
+    const gearOf = kind => {
+        const model = modelOf(kind), names = configOf(kind).gear || configOf(model).gear || [];
+        return names.map(name => POSES[model]()[name]());
     };
     // Phases in which a monster is in a fight.
     const FIGHTING = new Set(['rise', 'alert', 'chase', 'approach', 'windup', 'swing', 'recover', 'reel']);
@@ -67,7 +68,7 @@ const monsterKit = (() => {
     // Distance walked by the monster being ticked, for its gait.
     let walked = 0;
 
-    function rig(kind) { const S = configOf(kind), model = modelOf(kind); return rigKit.build(MODELS[model](), { scale: S.scale || 1, equipment: (GEAR[kind] || GEAR[model])() }); }
+    function rig(kind) { const S = configOf(kind), model = modelOf(kind); return rigKit.build(MODELS[model](), { scale: S.scale || 1, equipment: gearOf(kind) }); }
     // The colours a kind swaps (models/: a model's `looks`).
     function look(kind) { const S = configOf(kind); return S.look ? MODELS[modelOf(kind)]().looks[S.look] : {}; }
     function create(terrain, spawn, index) {

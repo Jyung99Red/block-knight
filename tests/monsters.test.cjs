@@ -18,10 +18,11 @@ const plain = value => JSON.parse(JSON.stringify(value));
 const player = R.build(playerModel, { equipment: equipmentModels.forLoadout(gameConfig.gear.starter) });
 const still = { gait: 0, moveBlend: 0, runBlend: 0, guardBlend: 0, stun: 0 };
 const standing = kind => ({ kind, phase: 'patrol', t: 0, move: null, flinch: 0, gait: 0, moveBlend: 0 });
-const KINDS = ['goblin', 'wolf', 'spider', 'goblinChief', 'wolfKing', 'minotaur'];
+// Every kind the config has (its other keys are numbers shared by all).
+const KINDS = Object.keys(MON).filter(k => MON[k]?.maxHp !== undefined);
 const rigs = Object.fromEntries(KINDS.map(k => [k, monsterKit.rig(k)]));
 // Moves drawn either way round, mirrored at random (models/: `either`).
-const either = (kind, name) => !!{ goblin: g.goblinPoses, wolf: g.wolfPoses, spider: g.spiderPoses, minotaur: g.minotaurPoses }[monsterKit.modelOf(kind)].moves[MON[kind].moves[name].pose || name].either;
+const either = (kind, name) => !!g[`${monsterKit.modelOf(kind)}Poses`].moves[MON[kind].moves[name].pose || name].either;
 
 // ---- the player's cuts on monsters (design.md 4.3) ----
 // Each move swung with a weapon of its type.
@@ -195,7 +196,7 @@ test('the windup turns to follow the player until `lock` before the swing, then 
 
 // ---- choosing what to do (design.md 5.2) ----
 // An open walled square with one monster of `kind` at home in its middle.
-const LETTER = { goblin: 'g', wolf: 'w', spider: 's', goblinChief: 'G', wolfKing: 'K', minotaur: 'M' }, HOME = { x: 820, y: 620 };
+const LETTER = Object.fromEntries(KINDS.map(k => [k, MON[k].letter])), HOME = { x: 820, y: 620 };
 function open(kind, seed = 1, loadout = null) {
     const rows = Array.from({ length: 30 }, (_, r) => r === 0 || r === 29 ? '1'.repeat(40) : '1' + '.'.repeat(38) + '1');
     const mark = (r, c, ch) => { rows[r] = rows[r].slice(0, c) + ch + rows[r].slice(c + 1); };

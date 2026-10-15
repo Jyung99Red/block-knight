@@ -106,12 +106,21 @@ const renderEffects = (() => {
         // id -> seconds left.
         const blinks = new Map(), BLINK = 0.2;
         const blinking = id => (blinks.get(id) || 0) > 0;
-        // A monster's colours (models/palette.js), for the burst as it falls.
-        const FALLEN = Object.fromEntries(Object.entries({
-            goblin: ['goblin', 'goblinLight', 'rag'], wolf: ['wolf', 'wolfLight', 'wolfDark'], spider: ['spider', 'spiderLight', 'spiderMark'],
-            goblinChief: ['chiefSkin', 'chiefRag', 'helmet', 'gold'], wolfKing: ['kingFur', 'mane', 'kingEye', 'gold'],
-            minotaur: ['minoFur', 'minoHead', 'horn', 'gold']
-        }).map(([kind, names]) => [kind, names.map(name => palette[name])]));
+        // A monster's colours (models/palette.js), for the burst as it falls:
+        // the four that fill most of its boxes (gear too), its look's swaps
+        // applied. Worked out the first time a kind falls.
+        const fallen = new Map();
+        function fallenOf(kind) {
+            if (!fallen.has(kind)) {
+                const known = gameConfig.monsters[kind]?.maxHp !== undefined, swap = known ? monsterKit.look(kind) : {}, volume = new Map();
+                if (known) for (const part of monsterKit.rig(kind).parts) {
+                    const name = swap[part.color] || part.color;
+                    volume.set(name, (volume.get(name) || 0) + part.size[0] * part.size[1] * part.size[2]);
+                }
+                fallen.set(kind, known ? [...volume].sort((a, b) => b[1] - a[1]).slice(0, 4).map(([name]) => palette[name]) : undefined);
+            }
+            return fallen.get(kind);
+        }
         let shake = 0, cue = 0, rested = 0;
         function onEvents(events, selfId = 'player') {
             for (const e of events) {
@@ -128,8 +137,8 @@ const renderEffects = (() => {
                 else if (e.type === 'parry') {
                     flash.set(e.target, 0.12); blinks.set(e.side, BLINK); shake = Math.max(shake, 0.1);
                 }
-                else if (e.type === 'defeated') burst(e.at, e.boss ? 30 : 14, FALLEN[e.kind] || ['#ffffff'], 1.2, e.boss ? 3.4 : 2.6, e.boss ? 0.1 : 0.08);
-                else if (e.type === 'revive') { burst(e.at, 30, ['#a183ff', '#ecd9ff', '#6b4a2a', ...(FALLEN[e.kind] || [])], 1.4, 3.4, 0.1); shake = Math.max(shake, 0.12); }
+                else if (e.type === 'defeated') burst(e.at, e.boss ? 30 : 14, fallenOf(e.kind) || ['#ffffff'], 1.2, e.boss ? 3.4 : 2.6, e.boss ? 0.1 : 0.08);
+                else if (e.type === 'revive') { burst(e.at, 30, ['#a183ff', '#ecd9ff', '#6b4a2a', ...(fallenOf(e.kind) || [])], 1.4, 3.4, 0.1); shake = Math.max(shake, 0.12); }
                 else if (e.type === 'chest_open') burst(e.at, 16, ['#ffe066', '#d8b04a', '#ffffff'], 1.2, 3, 0.06);
                 else if (e.type === 'pickup' && e.side === selfId) burst(e.at, 3, ['#fff3b0', '#ffffff'], 0.6, 1.2, 0.04);
                 else if ((e.type === 'rest' || e.type === 'camp') && e.side === selfId) rested = 0.9;

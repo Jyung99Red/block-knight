@@ -32,8 +32,17 @@ const terrainKit = (() => {
     const BARRED = new Set([KIND.water, KIND.drop]);
     const RESOURCE = new Set([KIND.ore, KIND.crystal, KIND.herb, KIND.log]);
     const TREE_HEIGHT = 4, HOUSE_HEIGHT = 3, PORTAL_HEIGHT = 3, BRUSH_HEIGHT = 2;
-    // Map letters that put a monster's home on a grass block.
-    const MONSTERS = Object.freeze({ g: 'goblin', w: 'wolf', s: 'spider', G: 'goblinChief', K: 'wolfKing', M: 'minotaur' });
+    // Map letters that put a monster's home on a grass block: each kind's
+    // own `letter` (gameConfig.monsters).
+    const MONSTERS = (() => {
+        const out = {};
+        for (const [kind, S] of Object.entries(gameConfig.monsters)) {
+            if (!S || typeof S !== 'object') continue;
+            if (!S.letter || out[S.letter]) throw new Error(`Monster ${kind} needs a letter of its own`);
+            out[S.letter] = kind;
+        }
+        return Object.freeze(out);
+    })();
     // Map letters that put a lamp on a ground block (core/props.js): a
     // torch on a stand, and one on the wall beside the block.
     const LAMPS = Object.freeze({ i: 'stand', '!': 'wall' });
