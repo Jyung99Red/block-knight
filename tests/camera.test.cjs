@@ -102,6 +102,20 @@ test('holdCamera: ground too small for the picture is looked at from its middle;
     assert.ok(Number.isFinite(cut[0]) && Number.isFinite(cut[1]));
 });
 
+test('holdCamera: `edgeAhead` sets the margin at the picture\'s top and leaves the other sides alone', () => {
+    const AHEAD = EDGE + 1.5, o = { reach: BOX, edge: EDGE, edgeAhead: AHEAD };
+    const north = space.holdCamera([30, BOX[1]], 0, view, o);
+    near(north[1] - view.ahead, BOX[1] - AHEAD, 'the picture\'s top is `edgeAhead` past the ground');
+    near(north[1] - BOX[1], view.ahead - AHEAD, 'the body stands this far from the middle');
+    near(space.holdCamera([BOX[0], 35], 0, view, o)[0] - view.right, BOX[0] - EDGE, 'the west side still uses `edge`');
+    near(space.holdCamera([30, BOX[3]], 0, view, o)[1] + view.behind, BOX[3] + EDGE, 'and so does the bottom');
+    for (let k = 0; k < 36; k++) for (let i = 0; i <= 8; i++) for (let j = 0; j <= 8; j++) {
+        const at = [BOX[0] + (BOX[2] - BOX[0]) * i / 8, BOX[1] + (BOX[3] - BOX[1]) * j / 8], yaw = k * Math.PI / 18;
+        const [across, along] = placed(at, space.holdCamera(at, yaw, view, o), yaw);
+        assert.ok(along <= view.ahead - AHEAD + 1e-9 && along >= -(view.behind - EDGE) - 1e-9 && Math.abs(across) <= view.right - EDGE + 1e-9, `yaw ${yaw}, body ${at}`);
+    }
+});
+
 test('pictureReaches: light is wanted where it can fall on the picture and not further', () => {
     const look = [30, 30];
     // Looking north (yaw 0): `ahead` north, `behind` south, `wide` to each side.

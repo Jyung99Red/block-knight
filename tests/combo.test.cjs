@@ -191,7 +191,7 @@ test('a held B waits its turn as an opening charge; an A after a landed charged 
     assert.equal(phase(sim), 'charge:charged', 'held through the finisher, B starts charging when it is over');
     release(sim, 'attack');
     // The hitstop of a landed cut does not eat the buffered A's time.
-    const hit = setup({ near: true }); press(hit, 'attack'); step(hit, 0.6); release(hit, 'attack'); step(hit, 0.02); tap(hit);
+    const hit = setup({ near: true }); press(hit, 'attack'); step(hit, M.charged.windup + 0.06); release(hit, 'attack'); step(hit, 0.02); tap(hit);
     until(hit, 'windup:follow'); assert.equal(hit.player.act.move, 'follow');
     assert.equal(hit.stats.hits, 1);
 });

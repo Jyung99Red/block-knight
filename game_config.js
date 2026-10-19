@@ -175,7 +175,7 @@ const gameConfig = (() => {
                 thrust: { weapon: 'sword', name: '连刺', windup: 0.30, swing: 0.08, recovery: 0.56, ratio: 0.61, stagger: 0, knockback: 0, step: 15, guardBreak: true },
                 rising: { weapon: 'sword', name: '上挑', windup: 0.38, swing: 0.12, recovery: 0.57, ratio: 0.74, stagger: 2, knockback: 16, step: 3 },
                 cleave: { weapon: 'sword', name: '下劈', windup: 0.38, swing: 0.10, recovery: 0.59, ratio: 0.80, stagger: 2, knockback: 16, step: 5 },
-                charged: { weapon: 'sword', name: '蓄力斩', windup: 0.54, swing: 0.14, recovery: 0.63, derive: 0.30, ratio: 0.36, chargeRatio: 0.96, stagger: 2, knockback: 20, step: 4, chargeStep: 13, charge: true, next: { a: 'follow' } },
+                charged: { weapon: 'sword', name: '蓄力斩', windup: 0.76, swing: 0.14, recovery: 0.63, derive: 0.30, ratio: 0.36, chargeRatio: 0.96, stagger: 2, knockback: 20, step: 4, chargeStep: 13, charge: true, next: { a: 'follow' } },
                 follow: { weapon: 'sword', name: '追斩', windup: 0.13, swing: 0.10, recovery: 0.51, ratio: 0.48, stagger: 0, knockback: 0, step: 3 },
                 cut: { weapon: 'dagger', name: '斜切', windup: 0.10, swing: 0.08, recovery: 0.30, derive: 0.12, ratio: 0.26, stagger: 0, knockback: 0, step: 4, next: { a: 'recut', b: 'flick' } },
                 recut: { weapon: 'dagger', name: '反切', windup: 0.10, swing: 0.08, recovery: 0.32, derive: 0.12, ratio: 0.26, stagger: 0, knockback: 0, step: 4, next: { a: 'stab', b: 'flick', pause: 'retreat' } },
@@ -505,6 +505,10 @@ const gameConfig = (() => {
         // what lies past the map: the picture shows no more than this many
         // blocks beyond that ground, which puts the fighter standing at its
         // edge this far short of the picture's (user, 2026-10-09: 2 to 3).
+        // edgeAhead: the same for the picture's top. The ground there is
+        // foreshortened, so 2.5 blocks are only about 190 px against about
+        // 315 px at the sides and bottom (1080p); 4 blocks match them
+        // (user, 2026-10-19: the fighter stood too near the top).
         //
         // title: the title screen's camera (design.md 3.6; user,
         // 2026-10-08): not the fighter's; shot after shot, `seconds` each,
@@ -520,7 +524,7 @@ const gameConfig = (() => {
         // stands, a share of the screen's width (the name and the keys are
         // on the left).
         camera: {
-            yaw: 0, pitch: 1.01, distance: 16, fov: 30, lookHeight: 0.8, edge: 2.5, zoom: { near: 0.87, mid: 1, far: 1.13 },
+            yaw: 0, pitch: 1.01, distance: 16, fov: 30, lookHeight: 0.8, edge: 2.5, edgeAhead: 4, zoom: { near: 0.87, mid: 1, far: 1.13 },
             title: {
                 seconds: 7, fade: 0.7, shift: 0.16, fov: 45,
                 things: { building: [5, 1.4], portal: [3.5, 1.5], chest: [1.8, 0.5], stand: [2, 1.1], dummy: [2.4, 1] },

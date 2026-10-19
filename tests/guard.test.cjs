@@ -160,7 +160,7 @@ test('a move plays out whole before the shield goes up; a charge is dropped at o
     step(held, gameConfig.combo.moves.charged.windup - told + 0.02);
     assert.equal(held.player.act, null); assert.equal(held.player.guard.state, 'raising');
     release(held, 'attack'); step(held, 0.5); assert.equal(held.stats.attacks, 1, 'the charge never cut');
-    const charge = quiet(); press(charge, 'attack'); step(charge, 0.6); assert.equal(charge.player.act.phase, 'charge');
+    const charge = quiet(); press(charge, 'attack'); step(charge, gameConfig.combo.moves.charged.windup + 0.06); assert.equal(charge.player.act.phase, 'charge');
     press(charge, 'guard'); release(charge, 'attack'); step(charge, 1);
     assert.equal(charge.player.act, null); assert.equal(charge.stats.attacks, 1, 'the charge is dropped, not fired');
 });

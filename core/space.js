@@ -46,12 +46,19 @@ const space = (() => {
     // the ground is not shown. Ground too small for that along one axis is
     // looked at from its middle. Whichever way the camera is turned the body
     // is never left nearer the picture's edge than `edge`.
-    function holdCamera(at, yaw, view, { reach, edge, far = Infinity }) {
+    //
+    // `edgeAhead` (default `edge`) is the same for the picture's top: the
+    // far edge of the ground is foreshortened, so `edge` blocks there are
+    // fewer pixels than at the sides and bottom, and the body would stand
+    // too near the top of the screen. The picture's far corners are drawn
+    // in by the difference, so the picture-inside-the-ground rule above
+    // leaves `edgeAhead` there, whichever way the camera is turned.
+    function holdCamera(at, yaw, view, { reach, edge, edgeAhead = edge, far = Infinity }) {
         const right = Math.min(far, view.right), ahead = Math.min(far, view.ahead), behind = Math.min(far, view.behind);
         const c = Math.cos(yaw), s = Math.sin(yaw);
         // The picture's corners about the point looked at, as offsets on the ground.
         const low = [Infinity, Infinity], high = [-Infinity, -Infinity];
-        for (const u of [-right, right]) for (const f of [-behind, ahead]) {
+        for (const u of [-right, right]) for (const f of [-behind, ahead - (edgeAhead - edge)]) {
             const o = [c * u - s * f, -s * u - c * f];
             for (let i = 0; i < 2; i++) { low[i] = Math.min(low[i], o[i]); high[i] = Math.max(high[i], o[i]); }
         }
@@ -64,7 +71,7 @@ const space = (() => {
         const x = hold(at[0], 0), z = hold(at[1], 1);
         // Where the body stands in the picture, kept `edge` short of its sides.
         const across = acrossOf(at[0] - x, at[1] - z, yaw), along = alongOf(at[0] - x, at[1] - z, yaw);
-        const sideways = Math.max(0, right - edge), up = Math.max(0, ahead - edge), down = Math.max(0, behind - edge);
+        const sideways = Math.max(0, right - edge), up = Math.max(0, ahead - edgeAhead), down = Math.max(0, behind - edge);
         const u = Math.max(-sideways, Math.min(sideways, across)), f = Math.max(-down, Math.min(up, along));
         if (u === across && f === along) return [x, z];
         return [at[0] - (c * u - s * f), at[1] - (-s * u - c * f)];

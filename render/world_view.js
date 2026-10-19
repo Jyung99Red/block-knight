@@ -387,7 +387,7 @@ const worldView = (() => {
             // edge of the ground it can come to (camera.edge).
             const at = space.toBlocks(me.x, me.y, me.h);
             const picture = view ? null : pictureOf(pitch);
-            const look = view ? null : space.holdCamera([at[0], at[2]], yaw, picture, { reach: roam, edge: C.camera.edge, far: FAR });
+            const look = view ? null : space.holdCamera([at[0], at[2]], yaw, picture, { reach: roam, edge: C.camera.edge, edgeAhead: C.camera.edgeAhead, far: FAR });
             // What this fighter does not see is not drawn: a rival, a
             // monster or the dummy behind its back or behind a wall. In a
             // shared adventure what the partner sees is seen too (user,
