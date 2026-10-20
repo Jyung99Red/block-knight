@@ -80,14 +80,15 @@ const playerAnim = (() => {
         return g;
     }
     const gaitOf = rig => {
-        if (!cycles.has(rig)) cycles.set(rig, { walk: measure(rig, 'walk'), run: measure(rig, 'run') });
+        if (!cycles.has(rig)) cycles.set(rig, { walk: measure(rig, 'walk'), guardWalk: measure(rig, 'guardWalk'), run: measure(rig, 'run') });
         return cycles.get(rig);
     };
-    // Cycle length for a walk-to-run blend; the simulation advances the gait
-    // phase by distance over this.
-    function cycleLength(rig, runBlend = 0) {
-        const c = gaitOf(rig);
-        return c.walk.length + (c.run.length - c.walk.length) * runBlend;
+    // Cycle length for a walk-to-run blend, the walk going over to the
+    // guard's as the guard comes up; the simulation advances the gait phase
+    // by distance over this.
+    function cycleLength(rig, runBlend = 0, guardBlend = 0) {
+        const c = gaitOf(rig), walk = c.walk.length + (c.guardWalk.length - c.walk.length) * guardBlend;
+        return walk + (c.run.length - walk) * runBlend;
     }
     const halfOf = phase => ((phase % 0.5) + 0.5) % 0.5;
     // The key phase shown at gait phase `phase`: along the stance, timed so
@@ -98,13 +99,15 @@ const playerAnim = (() => {
         const f = half / g.stance * PLANT, i = Math.min(PLANT - 1, Math.floor(f));
         return phase - half + g.warp[i] + (g.warp[i + 1] - g.warp[i]) * (f - i);
     }
-    function legs(rig, phase, moveBlend, runBlend) {
-        const c = gaitOf(rig), stride = rigKit.mix(loop(keysOf('walk', 'legs'), keyPhase(c.walk, phase)), loop(keysOf('run', 'legs'), keyPhase(c.run, phase)), runBlend);
+    function legs(rig, phase, moveBlend, runBlend, guardBlend) {
+        const c = gaitOf(rig), step = name => loop(keysOf(name, 'legs'), keyPhase(c[name], phase));
+        const stride = rigKit.mix(rigKit.mix(step('walk'), step('guardWalk'), guardBlend), step('run'), runBlend);
         return rigKit.mix(rigKit.pick(playerPoses.stance, playerModel.layers.lower), stride, moveBlend);
     }
     // Jogging or running, the body is off the ground between strides
-    // (model units above the grounded pose). `calm`: how much of the
-    // walk's flight is kept (none under a raised guard or a charge).
+    // (model units above the grounded pose). `calm`: how much of the jog's
+    // flight is kept, as much as the jog is shown (less as the guard comes
+    // up, its walk keeping a foot down; none under a charge).
     function airOf(g, half) {
         if (!g.air || half < g.stance) return 0;
         const f = (half - g.stance) / (0.5 - g.stance) * PLANT, i = Math.min(PLANT - 1, Math.floor(f));
@@ -115,11 +118,11 @@ const playerAnim = (() => {
         return airOf(c.walk, half) * (1 - runBlend) * calm + airOf(c.run, half) * runBlend;
     }
     function locomotion(rig, body) {
-        const P = playerPoses, run = body.runBlend || 0;
+        const P = playerPoses, run = body.runBlend || 0, guard = clamp01(body.guardBlend || 0);
         const swing = name => rigKit.add(loop(keysOf(name, 'arms'), body.gait), P[name].carry || {});
-        const arms = rigKit.mix(swing('walk'), swing('run'), run);
+        const arms = rigKit.mix(rigKit.mix(swing('walk'), swing('guardWalk'), guard), swing('run'), run);
         const upper = rigKit.add(rigKit.pick(P.stance, playerModel.layers.upper), rigKit.scale(arms, body.moveBlend));
-        return rigKit.add(legs(rig, body.gait, body.moveBlend, run), upper);
+        return rigKit.add(legs(rig, body.gait, body.moveBlend, run, guard), upper);
     }
     // A move in progress, `act` = { move, phase, t, lead, from }: the windup
     // eases from wherever the previous move's recovery had got to (or the

@@ -461,7 +461,7 @@ const moveLab = (() => {
         const loadout = loadoutOf(type, hand !== undefined ? hand : offhand);
         const at = LEAD, ramp = (t, from, len) => clamp01((t - from) / len), H = gameConfig.interact.hand, V = F.guard.shove;
         // Walking under the guard, as fast as the guard lets the body go.
-        const speed = gameConfig.player.speed * F.guard.moveMultiplier, cycle = playerAnim.cycleLength(rigOf(loadout), 0);
+        const speed = gameConfig.player.speed * F.guard.moveMultiplier, cycle = playerAnim.cycleLength(rigOf(loadout), 0, 1);
         const walked = t => Math.max(0, t - at) * speed;
         const shows = {
             stance: { duration: 1.6, key: 0, body: () => ({}) },

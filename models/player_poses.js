@@ -36,6 +36,20 @@ const playerPoses = Object.freeze({
         carry: { forearmR: { rx: -0.4 }, handR: { rx: -0.3 } },
         flight: { height: 0.03 }
     },
+    // Walking under a raised guard: the walk as it was before the jog
+    // (user, 2026-10-20), contact and passing, one foot always down; the
+    // guard's bent knees are added (core/player_anim.js guardLegs).
+    guardWalk: {
+        legs: [
+            { pelvis: { ry: 0.08 }, thighR: { rx: -0.68 }, shinR: { rx: 0.12 }, thighL: { rx: 0.56 }, shinL: { rx: 0.39 } },
+            { thighR: { rx: 0.06 }, shinR: { rx: 0.12 }, thighL: { rx: -0.56 }, shinL: { rx: 1.36 } }
+        ],
+        arms: [
+            { chest: { rx: 0.065, ry: -0.09 }, upperArmR: { rx: 0.27 }, upperArmL: { rx: -0.31 } },
+            { chest: { rx: 0.065 } }
+        ],
+        carry: { forearmR: { rx: -0.15 }, handR: { rx: -0.15 } }
+    },
     // Running, a jog (user, 2026-10-02): touchdown, mid-stance (the knee
     // gives), toe-off; from the toe-off to the other foot's touchdown both
     // feet are off the ground, the body `flight.height` (blocks) up at
