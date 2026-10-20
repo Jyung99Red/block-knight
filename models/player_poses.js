@@ -19,18 +19,22 @@ const playerPoses = Object.freeze({
     // body. The stride is measured from the legs, and the keys are timed
     // along it, so feet do not slide whatever the angles
     // (core/player_anim.js).
-    // Walking: contact, passing. Strides between the first walk's and the
-    // long one (user, 2026-10-02: the speed half way, the steps as unhurried).
+    // Walking, a light jog at the walking speed (user, 2026-10-20; was a
+    // walk of contact and passing): touchdown, mid-stance, toe-off, then
+    // both feet a little off the ground; shorter strides than the run's,
+    // the elbows bent.
     walk: {
         legs: [
-            { pelvis: { ry: 0.08 }, thighR: { rx: -0.68 }, shinR: { rx: 0.12 }, thighL: { rx: 0.56 }, shinL: { rx: 0.39 } },
-            { thighR: { rx: 0.06 }, shinR: { rx: 0.12 }, thighL: { rx: -0.56 }, shinL: { rx: 1.36 } }
+            { pelvis: { ry: 0.06 }, thighR: { rx: -0.48 }, shinR: { rx: 0.25 }, thighL: { rx: 0.48 }, shinL: { rx: 1.1 } },
+            { thighR: { rx: -0.12 }, shinR: { rx: 0.38 }, thighL: { rx: -0.25 }, shinL: { rx: 1.55 } },
+            { pelvis: { ry: -0.03 }, thighR: { rx: 0.52 }, shinR: { rx: 0.08 }, thighL: { rx: -0.66 }, shinL: { rx: 1.0 } }
         ],
         arms: [
-            { chest: { rx: 0.065, ry: -0.09 }, upperArmR: { rx: 0.27 }, upperArmL: { rx: -0.31 } },
-            { chest: { rx: 0.065 } }
+            { chest: { rx: 0.1, ry: -0.08 }, upperArmR: { rx: 0.3 }, upperArmL: { rx: -0.34 }, forearmL: { rx: -0.25 } },
+            { chest: { rx: 0.1 } }
         ],
-        carry: { forearmR: { rx: -0.15 }, handR: { rx: -0.15 } }
+        carry: { forearmR: { rx: -0.4 }, handR: { rx: -0.3 } },
+        flight: { height: 0.03 }
     },
     // Running, a jog (user, 2026-10-02): touchdown, mid-stance (the knee
     // gives), toe-off; from the toe-off to the other foot's touchdown both

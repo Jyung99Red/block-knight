@@ -36,8 +36,8 @@ const playerAnim = (() => {
     }
     // A pure gait, measured once per skeleton. Each step starts as the
     // right foot comes down (key 0) and stays down for `stance` of the
-    // cycle: the whole step walking; running, up to the last key of the
-    // step, then both feet are off the ground until the other foot comes
+    // cycle: the whole step for a gait without `flight`; with one (the jog
+    // and the run), up to the last key of the step, then both feet are off the ground until the other foot comes
     // down (models/player_poses.js). `length`: world units covered by one
     // full cycle, so that the body goes as far over the stance as the
     // planted foot goes back. The keys swing the legs on curves, so the
@@ -102,13 +102,17 @@ const playerAnim = (() => {
         const c = gaitOf(rig), stride = rigKit.mix(loop(keysOf('walk', 'legs'), keyPhase(c.walk, phase)), loop(keysOf('run', 'legs'), keyPhase(c.run, phase)), runBlend);
         return rigKit.mix(rigKit.pick(playerPoses.stance, playerModel.layers.lower), stride, moveBlend);
     }
-    // Running, the body is off the ground between strides (model units
-    // above the grounded pose).
-    function lift(rig, phase, runBlend) {
-        const g = gaitOf(rig).run, half = halfOf(phase);
-        if (!g.air || !(runBlend > 0) || half < g.stance) return 0;
+    // Jogging or running, the body is off the ground between strides
+    // (model units above the grounded pose). `calm`: how much of the
+    // walk's flight is kept (none under a raised guard or a charge).
+    function airOf(g, half) {
+        if (!g.air || half < g.stance) return 0;
         const f = (half - g.stance) / (0.5 - g.stance) * PLANT, i = Math.min(PLANT - 1, Math.floor(f));
-        return (g.air[i] + (g.air[i + 1] - g.air[i]) * (f - i)) * runBlend;
+        return g.air[i] + (g.air[i + 1] - g.air[i]) * (f - i);
+    }
+    function lift(rig, phase, runBlend, calm = 1) {
+        const c = gaitOf(rig), half = halfOf(phase);
+        return airOf(c.walk, half) * (1 - runBlend) * calm + airOf(c.run, half) * runBlend;
     }
     function locomotion(rig, body) {
         const P = playerPoses, run = body.runBlend || 0;
@@ -364,7 +368,8 @@ const playerAnim = (() => {
             pose = rigKit.add(pose, rigKit.scale(playerMoves.flinch, k));
         }
         if (standing && !body.down) return rigKit.add(pose);
-        const air = lift(rig, body.gait, body.runBlend || 0) * body.moveBlend * stepping;
+        const calm = act?.phase === 'charge' ? 0 : 1 - clamp01(body.guardBlend || 0);
+        const air = lift(rig, body.gait, body.runBlend || 0, calm) * body.moveBlend * stepping;
         return air > 0 ? rigKit.add(grounded(rig, pose), { base: { py: air } }) : grounded(rig, pose);
     }
     // Drawn-only additions. `look` = { time, lean (radians), full (a charge
