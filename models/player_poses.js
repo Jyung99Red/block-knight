@@ -36,10 +36,11 @@ const playerPoses = Object.freeze({
         carry: { forearmR: { rx: -0.4 }, handR: { rx: -0.3 } },
         flight: { height: 0.03 }
     },
-    // Walking under a raised guard: the walk as it was before the jog
-    // (user, 2026-10-20), contact and passing, one foot always down; the
-    // guard's bent knees are added (core/player_anim.js guardLegs).
-    guardWalk: {
+    // Walking under a raised guard or a held charge: the walk as it was
+    // before the jog (user, 2026-10-20), contact and passing, one foot
+    // always down; under a guard its bent knees are added
+    // (core/player_anim.js guardLegs).
+    steadyWalk: {
         legs: [
             { pelvis: { ry: 0.08 }, thighR: { rx: -0.68 }, shinR: { rx: 0.12 }, thighL: { rx: 0.56 }, shinL: { rx: 0.39 } },
             { thighR: { rx: 0.06 }, shinR: { rx: 0.12 }, thighL: { rx: -0.56 }, shinL: { rx: 1.36 } }

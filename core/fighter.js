@@ -470,7 +470,7 @@ const fighterKit = (() => {
             const x0 = p.x, y0 = p.y;
             terrainKit.moveCircle(sim.terrain, p, mv.x / mag * speed * dt, mv.y / mag * speed * dt, obstacles(sim, p));
             const moved = Math.hypot(p.x - x0, p.y - y0);
-            p.gait += moved / playerAnim.cycleLength(rigOf(sim, p), p.runBlend, p.guardBlend);
+            p.gait += moved / playerAnim.cycleLength(rigOf(sim, p), p.runBlend, playerAnim.steadyOf(a, p.guardBlend));
             p.speed = moved / dt;
             p.facing = space.turn(p.facing, Math.atan2(mv.y, mv.x), turn * dt);
             // Walking off ends the combo.
